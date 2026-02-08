@@ -66,7 +66,8 @@ const keys = {
   ArrowUp: false,
   ArrowLeft: false,
   ArrowRight: false,
-  Space: false
+  Space: false,
+  KeyE: false
 };
 
 let player;
@@ -78,6 +79,14 @@ let velocityY = 0;
 const gravity = 26;
 const jumpVelocity = 9;
 const groundY = 0;
+
+const interactable = {
+  mesh: null,
+  radius: 2.2,
+  activated: false,
+  promptEl: null,
+  statusEl: null
+};
 
 const animPaths = {
   idle: idleFbxUrl,
@@ -190,6 +199,64 @@ async function loadCharacterAndAnimations() {
   }
 }
 
+function createInteractable() {
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.6, 0.25, 24),
+    new THREE.MeshStandardMaterial({ color: 0x4a5b75, roughness: 0.55, metalness: 0.35 })
+  );
+  base.position.set(4.5, 0.12, -2.8);
+  base.receiveShadow = true;
+
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.38, 24, 24),
+    new THREE.MeshStandardMaterial({
+      color: 0x66d8ff,
+      emissive: 0x1f8fff,
+      emissiveIntensity: 0.7,
+      roughness: 0.25,
+      metalness: 0.12
+    })
+  );
+  orb.position.y = 0.42;
+  orb.castShadow = true;
+  base.add(orb);
+
+  interactable.mesh = base;
+  scene.add(base);
+
+  interactable.promptEl = document.createElement('div');
+  interactable.promptEl.id = 'interaction-prompt';
+  interactable.promptEl.textContent = 'Press E to inspect glowing orb';
+  document.body.appendChild(interactable.promptEl);
+
+  interactable.statusEl = document.createElement('div');
+  interactable.statusEl.id = 'interaction-status';
+  document.body.appendChild(interactable.statusEl);
+}
+
+function updateInteractionUI(canInteract) {
+  if (!interactable.promptEl) return;
+  interactable.promptEl.style.opacity = canInteract ? '1' : '0';
+  interactable.promptEl.style.transform = canInteract ? 'translate(-50%, 0)' : 'translate(-50%, 6px)';
+}
+
+function triggerInteraction() {
+  if (!interactable.mesh || !interactable.statusEl) return;
+
+  interactable.activated = !interactable.activated;
+  const orb = interactable.mesh.children[0];
+  if (orb?.material) {
+    orb.material.color.setHex(interactable.activated ? 0x7dffb5 : 0x66d8ff);
+    orb.material.emissive.setHex(interactable.activated ? 0x1ba653 : 0x1f8fff);
+  }
+
+  interactable.statusEl.textContent = interactable.activated
+    ? 'Orb attuned. Ancient mechanism hums to life.'
+    : 'Orb calms down.';
+  interactable.statusEl.classList.add('show');
+  setTimeout(() => interactable.statusEl?.classList.remove('show'), 1400);
+}
+
 function onKey(isDown, e) {
   if (!(e.code in keys)) return;
   keys[e.code] = isDown;
@@ -199,6 +266,11 @@ function onKey(isDown, e) {
     jumping = true;
     velocityY = jumpVelocity;
     if (actions.jump) setAction('jump', 0.08);
+  }
+
+  if (isDown && e.code === 'KeyE' && player && interactable.mesh) {
+    const distance = player.position.distanceTo(interactable.mesh.position);
+    if (distance <= interactable.radius) triggerInteraction();
   }
 }
 
@@ -244,6 +316,19 @@ function updatePlayer(delta) {
   // soft camera follow
   const desiredTarget = player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
   controls.target.lerp(desiredTarget, 1 - Math.pow(0.001, delta));
+
+  if (interactable.mesh) {
+    const distance = player.position.distanceTo(interactable.mesh.position);
+    const canInteract = distance <= interactable.radius;
+    updateInteractionUI(canInteract);
+
+    const orb = interactable.mesh.children[0];
+    if (orb) {
+      const t = clock.elapsedTime;
+      orb.position.y = 0.42 + Math.sin(t * 2.2) * 0.06;
+      orb.material.emissiveIntensity = interactable.activated ? 1.05 : 0.65 + (Math.sin(t * 4.4) + 1) * 0.12;
+    }
+  }
 }
 
 function render() {
@@ -262,5 +347,6 @@ window.addEventListener('resize', () => {
 });
 
 loadCharacterAndAnimations().finally(() => {
+  createInteractable();
   render();
 });

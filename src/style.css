@@ -34,3 +34,34 @@ canvas {
   padding: 8px 10px;
   backdrop-filter: blur(3px);
 }
+
+#interaction-prompt,
+#interaction-status {
+  position: fixed;
+  left: 50%;
+  transform: translate(-50%, 6px);
+  z-index: 11;
+  color: #def8ff;
+  background: rgba(7, 26, 40, 0.75);
+  border: 1px solid rgba(121, 222, 255, 0.45);
+  border-radius: 10px;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  padding: 8px 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 160ms ease;
+}
+
+#interaction-prompt {
+  bottom: 48px;
+}
+
+#interaction-status {
+  top: 18px;
+}
+
+#interaction-status.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
