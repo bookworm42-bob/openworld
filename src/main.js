@@ -2,8 +2,6 @@ import './style.css';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-
 import idleFbxUrl from '../3d_models/boy/Sad Idle.fbx?url';
 import walkFbxUrl from '../3d_models/boy/Walking.fbx?url';
 import jumpFbxUrl from '../3d_models/boy/Jumping.fbx?url';
@@ -100,6 +98,21 @@ function setAction(nextName, fade = 0.2) {
   activeAction = next;
 }
 
+function normalizePlayerScaleAndGround(object3d, targetHeight = 1.8) {
+  const box = new THREE.Box3().setFromObject(object3d);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+  if (size.y > 0.0001) {
+    const scale = targetHeight / size.y;
+    object3d.scale.multiplyScalar(scale);
+  }
+
+  // Recompute and set feet on y=0.
+  box.setFromObject(object3d);
+  object3d.position.y -= box.min.y;
+}
+
 function inferAnimationClip(object3d) {
   if (object3d.animations?.length) return object3d.animations[0];
   let found = null;
@@ -119,7 +132,6 @@ async function loadCharacterAndAnimations() {
   try {
     // Load character once.
     player = await loadFBX(playerPath);
-    player.scale.setScalar(0.01);
     player.position.set(0, 0, 0);
     player.traverse((child) => {
       if (child.isMesh) {
@@ -128,6 +140,7 @@ async function loadCharacterAndAnimations() {
       }
     });
     scene.add(player);
+    normalizePlayerScaleAndGround(player);
 
     mixer = new THREE.AnimationMixer(player);
 
@@ -145,12 +158,10 @@ async function loadCharacterAndAnimations() {
       throw new Error('One or more animation clips missing from FBX files.');
     }
 
-    const walkRetargeted = SkeletonUtils.retargetClip(player, walkFbx, walkClip);
-    const jumpRetargeted = SkeletonUtils.retargetClip(player, jumpFbx, jumpClip);
-
+    // These clips come from the same rig family; direct binding is more stable than retargeting here.
     actions.idle = mixer.clipAction(idleClip);
-    actions.walk = mixer.clipAction(walkRetargeted);
-    actions.jump = mixer.clipAction(jumpRetargeted);
+    actions.walk = mixer.clipAction(walkClip);
+    actions.jump = mixer.clipAction(jumpClip);
 
     actions.walk.setLoop(THREE.LoopRepeat);
     actions.idle.setLoop(THREE.LoopRepeat);
@@ -158,6 +169,13 @@ async function loadCharacterAndAnimations() {
     actions.jump.clampWhenFinished = true;
 
     setAction('idle', 0.01);
+
+    // Reframe camera once character bounds are known.
+    const box = new THREE.Box3().setFromObject(player);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    controls.target.copy(center);
+    camera.position.set(center.x + 3.2, center.y + 2.2, center.z + 5.8);
   } catch (error) {
     console.error('Failed to load model/animations from ./3d_models/boy:', error);
 

@@ -55,6 +55,30 @@
       "size": "small",
       "milestone": "v1",
       "notes": "Updated runtime to consume real FBX files via Vite asset URLs and validated build output with included animation assets."
+    },
+    {
+      "id": "T-008",
+      "title": "Fix character visibility and animation binding stability with real FBX assets",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Normalized character scale/grounding, reframed camera after load, and switched walk/jump to direct clip binding for this rig family."
+    },
+    {
+      "id": "T-009",
+      "title": "Capture deterministic animation verification screenshots (idle/forward/right/jump) via Playwright",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Generated validation screenshots in artifacts/ and delivered images one-by-one in Telegram."
+    },
+    {
+      "id": "T-010",
+      "title": "Commit and push latest scene + validation artifacts to main",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Committed runtime + CI + validation scripts/artifacts and pushed to origin/main."
     }
   ]
 }
