@@ -4,6 +4,10 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
+import idleFbxUrl from '../3d_models/boy/Sad Idle.fbx?url';
+import walkFbxUrl from '../3d_models/boy/Walking.fbx?url';
+import jumpFbxUrl from '../3d_models/boy/Jumping.fbx?url';
+
 const app = document.getElementById('app');
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -78,12 +82,13 @@ const jumpVelocity = 9;
 const groundY = 0;
 
 const animPaths = {
-  idle: '/3d_models/Sad Idle.fbx',
-  walk: '/3d_models/Walking.fbx',
-  jump: '/3d_models/Jumping.fbx'
+  idle: idleFbxUrl,
+  walk: walkFbxUrl,
+  jump: jumpFbxUrl
 };
 
-const playerPath = '/3d_models/boy.fbx';
+// Use the idle FBX as the single loaded player rig/model source.
+const playerPath = animPaths.idle;
 
 function setAction(nextName, fade = 0.2) {
   const next = actions[nextName];
@@ -126,14 +131,13 @@ async function loadCharacterAndAnimations() {
 
     mixer = new THREE.AnimationMixer(player);
 
-    // Load animation FBX files separately and retarget to player skeleton.
-    const [idleFbx, walkFbx, jumpFbx] = await Promise.all([
-      loadFBX(animPaths.idle),
+    // Load only extra animation sources; player model is already loaded once from idle FBX.
+    const [walkFbx, jumpFbx] = await Promise.all([
       loadFBX(animPaths.walk),
       loadFBX(animPaths.jump)
     ]);
 
-    const idleClip = inferAnimationClip(idleFbx);
+    const idleClip = inferAnimationClip(player);
     const walkClip = inferAnimationClip(walkFbx);
     const jumpClip = inferAnimationClip(jumpFbx);
 
@@ -141,11 +145,10 @@ async function loadCharacterAndAnimations() {
       throw new Error('One or more animation clips missing from FBX files.');
     }
 
-    const idleRetargeted = SkeletonUtils.retargetClip(player, idleFbx, idleClip);
     const walkRetargeted = SkeletonUtils.retargetClip(player, walkFbx, walkClip);
     const jumpRetargeted = SkeletonUtils.retargetClip(player, jumpFbx, jumpClip);
 
-    actions.idle = mixer.clipAction(idleRetargeted);
+    actions.idle = mixer.clipAction(idleClip);
     actions.walk = mixer.clipAction(walkRetargeted);
     actions.jump = mixer.clipAction(jumpRetargeted);
 
@@ -156,7 +159,7 @@ async function loadCharacterAndAnimations() {
 
     setAction('idle', 0.01);
   } catch (error) {
-    console.error('Failed to load model/animations from /public/3d_models:', error);
+    console.error('Failed to load model/animations from ./3d_models/boy:', error);
 
     // Visual fallback so the scene still works while assets are being added.
     player = new THREE.Mesh(
