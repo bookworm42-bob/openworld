@@ -12,6 +12,7 @@
     "three": "^0.174.0"
   },
   "devDependencies": {
+    "playwright": "^1.58.2",
     "vite": "^6.1.0"
   }
 }
