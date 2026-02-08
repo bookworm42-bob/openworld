@@ -3,16 +3,18 @@
     {
       "id": "T-001",
       "title": "Scaffold Vite + Three.js app and verify local boot",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v0"
+      "milestone": "v0",
+      "notes": "Vite project initialized with Three.js, npm deps installed, and production build passes."
     },
     {
       "id": "T-002",
       "title": "Add basic WASD player controller with follow camera",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v0"
+      "milestone": "v0",
+      "notes": "Arrow key movement (forward/left/right), jump on Space, animation state blending (idle/walk/jump), and smooth camera follow implemented."
     },
     {
       "id": "T-003",
@@ -20,6 +22,22 @@
       "status": "ready",
       "size": "small",
       "milestone": "v0"
+    },
+    {
+      "id": "T-004",
+      "title": "Integrate boy model and external FBX animation clips (load model once, retarget clips)",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Character loaded once from /public/3d_models/boy.fbx; Sad Idle/Walking/Jumping clips loaded separately and retargeted via SkeletonUtils.retargetClip."
+    },
+    {
+      "id": "T-005",
+      "title": "Polish world visuals with sky gradient and floor styling",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Gradient sky styling, fog, directional/hemisphere lighting, and stylized green floor/grid added."
     }
   ]
 }
