@@ -19,10 +19,11 @@
     {
       "id": "T-003",
       "title": "Set up CI build check workflow",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v0"
-    },
+      "milestone": "v0",
+      "notes": "Added GitHub Actions workflow at .github/workflows/ci-build.yml to run npm ci + npm run build on push/PR."
+    }
     {
       "id": "T-004",
       "title": "Integrate boy model and external FBX animation clips (load model once, retarget clips)",
