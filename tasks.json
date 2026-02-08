@@ -23,7 +23,7 @@
       "size": "small",
       "milestone": "v0",
       "notes": "Added GitHub Actions workflow at .github/workflows/ci-build.yml to run npm ci + npm run build on push/PR."
-    }
+    },
     {
       "id": "T-004",
       "title": "Integrate boy model and external FBX animation clips (load model once, retarget clips)",
@@ -39,6 +39,27 @@
       "size": "small",
       "milestone": "v1",
       "notes": "Gradient sky styling, fog, directional/hemisphere lighting, and stylized green floor/grid added."
+    },
+    {
+      "id": "T-006",
+      "title": "Pull latest remote assets and verify /public/3d_models/boy FBX files are present",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v1"
+    },
+    {
+      "id": "T-007",
+      "title": "Tune animation blend timings and movement mapping for forward/left/right/jump with actual FBX clips",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v1"
+    },
+    {
+      "id": "T-008",
+      "title": "Add quick playtest route note and screenshot capture checklist",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v0"
     }
   ]
 }
