@@ -19,9 +19,10 @@
     {
       "id": "T-003",
       "title": "Set up CI build check workflow",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v0"
+      "milestone": "v0",
+      "notes": "Added GitHub Actions workflow at .github/workflows/ci-build.yml to run npm ci + npm run build on push and pull_request."
     },
     {
       "id": "T-004",
