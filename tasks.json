@@ -1,0 +1,25 @@
+{
+  "tasks": [
+    {
+      "id": "T-001",
+      "title": "Scaffold Vite + Three.js app and verify local boot",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v0"
+    },
+    {
+      "id": "T-002",
+      "title": "Add basic WASD player controller with follow camera",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v0"
+    },
+    {
+      "id": "T-003",
+      "title": "Set up CI build check workflow",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v0"
+    }
+  ]
+}
