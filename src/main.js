@@ -49,6 +49,113 @@ const TERRAIN_CHUNK_SEGMENTS = 45;
 const TERRAIN_VISIBILITY_DISTANCE = 125;
 
 const terrainChunks = [];
+const terrainBlendMaterials = [];
+
+function createGroundTexturePalette({ baseHex, accentHex, grainHex, seed = 1 }) {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const base = new THREE.Color(baseHex);
+  const accent = new THREE.Color(accentHex);
+  const grain = new THREE.Color(grainHex);
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const n = Math.sin((x + seed * 11.3) * 0.16) * Math.cos((y + seed * 7.1) * 0.14);
+      const patch = Math.sin((x + y) * 0.07 + seed) * 0.5 + 0.5;
+      const grainNoise = Math.sin((x * 1.73 + y * 2.41 + seed * 17.0) * 0.35) * 0.5 + 0.5;
+
+      const color = base.clone().lerp(accent, THREE.MathUtils.clamp(0.3 + n * 0.35 + patch * 0.35, 0, 1));
+      color.lerp(grain, grainNoise * 0.2);
+
+      ctx.fillStyle = `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+const stylizedGroundTextures = {
+  grass: createGroundTexturePalette({
+    baseHex: 0x3d5f6a,
+    accentHex: 0x5f8b8a,
+    grainHex: 0x2e3d4e,
+    seed: 2.2
+  }),
+  dirt: createGroundTexturePalette({
+    baseHex: 0x4a3f45,
+    accentHex: 0x6b5457,
+    grainHex: 0x332b31,
+    seed: 5.6
+  })
+};
+
+function applyDistanceGroundBlend(material) {
+  if (!material || material.userData?.groundBlendApplied) return material;
+
+  material.userData = {
+    ...material.userData,
+    groundBlendApplied: true
+  };
+
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uGroundGrassMap = { value: stylizedGroundTextures.grass };
+    shader.uniforms.uGroundDirtMap = { value: stylizedGroundTextures.dirt };
+    shader.uniforms.uGroundBlendNear = { value: 14.0 };
+    shader.uniforms.uGroundBlendFar = { value: 96.0 };
+    shader.uniforms.uGroundCameraPos = { value: new THREE.Vector3() };
+
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <common>',
+      '#include <common>\nvarying vec3 vGroundWorldPos;'
+    );
+
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <worldpos_vertex>',
+      '#include <worldpos_vertex>\nvGroundWorldPos = worldPosition.xyz;'
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      `#include <common>
+      varying vec3 vGroundWorldPos;
+      uniform sampler2D uGroundGrassMap;
+      uniform sampler2D uGroundDirtMap;
+      uniform float uGroundBlendNear;
+      uniform float uGroundBlendFar;
+      uniform vec3 uGroundCameraPos;`
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      `
+      vec2 terrainUv = vGroundWorldPos.xz * 0.085;
+      vec3 grassTex = texture2D(uGroundGrassMap, terrainUv).rgb;
+      vec3 dirtTex = texture2D(uGroundDirtMap, terrainUv * 0.75 + vec2(0.12, -0.08)).rgb;
+      float distFade = smoothstep(uGroundBlendNear, uGroundBlendFar, distance(vGroundWorldPos.xz, uGroundCameraPos.xz));
+      vec3 distanceTint = mix(vec3(1.04, 1.02, 1.0), vec3(0.86, 0.82, 0.88), distFade);
+      vec3 groundTex = mix(grassTex, dirtTex, distFade);
+      gl_FragColor.rgb *= groundTex * distanceTint * 1.18;
+      #include <dithering_fragment>
+      `
+    );
+
+    material.userData.groundBlendShader = shader;
+  };
+
+  material.needsUpdate = true;
+  terrainBlendMaterials.push(material);
+  return material;
+}
 
 function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments = TERRAIN_CHUNK_SEGMENTS) {
   const terrainGeometry = new THREE.PlaneGeometry(size, size, segments, segments);
@@ -80,14 +187,15 @@ function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments
   terrainGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   terrainGeometry.computeVertexNormals();
 
-  const floor = new THREE.Mesh(
-    terrainGeometry,
+  const floorMaterial = applyDistanceGroundBlend(
     new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.94,
       metalness: 0.02
     })
   );
+
+  const floor = new THREE.Mesh(terrainGeometry, floorMaterial);
   floor.position.set(centerX, 0, centerZ);
   floor.receiveShadow = true;
   scene.add(floor);
@@ -755,6 +863,9 @@ function render() {
   if (mixer) mixer.update(scaledDelta);
   updatePlayer(scaledDelta);
   updateTerrainChunkVisibility();
+  terrainBlendMaterials.forEach((material) => {
+    material.userData?.groundBlendShader?.uniforms?.uGroundCameraPos?.value.copy(camera.position);
+  });
   updateChunkHud();
   controls.update();
   renderer.render(scene, camera);

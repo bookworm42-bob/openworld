@@ -235,10 +235,10 @@
     {
       "id": "T-030",
       "title": "Programmer: add 1 lightweight CC0 ground material set (dirt + grass) and wire distance fade blend",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Source candidate: Poly Haven textures (CC0, attribution not required) https://polyhaven.com/license. Implement as two compressed tiling maps (<=512px each) with shader/lerp blend tied to camera distance; keep added gzip payload under ~120KB and preserve current stylized dusk palette."
+      "notes": "Implemented lightweight dual ground material set using in-code tiling grass+dirt textures (128x128 CanvasTexture each, zero external payload) and wired distance-based shader blend tied to camera range for near-grass/far-dirt readability within dusk palette. Updated terrain material pipeline with per-frame camera uniform updates. npm run build passes."
     },
     {
       "id": "T-031",
