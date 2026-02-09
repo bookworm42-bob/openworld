@@ -34,30 +34,56 @@ dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
 scene.add(dirLight);
 
+const terrainGeometry = new THREE.PlaneGeometry(220, 220, 90, 90);
+terrainGeometry.rotateX(-Math.PI / 2);
+
+const positions = terrainGeometry.attributes.position;
+const colors = [];
+const lowColor = new THREE.Color(0x377f4f);
+const highColor = new THREE.Color(0x5cab72);
+const tint = new THREE.Color();
+
+for (let i = 0; i < positions.count; i += 1) {
+  const x = positions.getX(i);
+  const z = positions.getZ(i);
+
+  const rolling = Math.sin(x * 0.07) * Math.cos(z * 0.05) * 0.12;
+  const patchNoise = Math.sin((x + z) * 0.18) * 0.04;
+  const y = rolling + patchNoise;
+
+  positions.setY(i, y);
+
+  const blend = THREE.MathUtils.clamp((y + 0.16) / 0.32, 0, 1);
+  tint.copy(lowColor).lerp(highColor, blend);
+  colors.push(tint.r, tint.g, tint.b);
+}
+
+terrainGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+terrainGeometry.computeVertexNormals();
+
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(220, 220),
+  terrainGeometry,
   new THREE.MeshStandardMaterial({
-    color: 0x3f8a5a,
-    roughness: 0.96,
+    vertexColors: true,
+    roughness: 0.94,
     metalness: 0.02
   })
 );
-floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Add subtle floor variation tiles for visual depth.
-const tileGeo = new THREE.PlaneGeometry(220, 220, 30, 30);
-const tileMat = new THREE.MeshBasicMaterial({
-  color: 0x4b9d64,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.09
-});
-const gridOverlay = new THREE.Mesh(tileGeo, tileMat);
-gridOverlay.rotation.x = -Math.PI / 2;
-gridOverlay.position.y = 0.02;
-scene.add(gridOverlay);
+const contourOverlay = new THREE.Mesh(
+  new THREE.PlaneGeometry(220, 220, 30, 30),
+  new THREE.MeshBasicMaterial({
+    color: 0x9fdb9f,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.07
+  })
+);
+contourOverlay.rotation.x = -Math.PI / 2;
+contourOverlay.position.y = 0.025;
+scene.add(contourOverlay);
 
 const loader = new FBXLoader();
 const clock = new THREE.Clock();
