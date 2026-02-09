@@ -167,6 +167,27 @@ const natureKitPaths = {
   logStack: '/assets/nature-kit/log_stackLarge.glb'
 };
 
+const landmarkLayout = [
+  {
+    id: 'tower-near',
+    type: 'tower',
+    position: new THREE.Vector2(20, -14),
+    scale: 1
+  },
+  {
+    id: 'ruins-mid',
+    type: 'ruins',
+    position: new THREE.Vector2(-46, 24),
+    scale: 1.2
+  },
+  {
+    id: 'windmill-far',
+    type: 'windmill',
+    position: new THREE.Vector2(74, 62),
+    scale: 1.55
+  }
+];
+
 // Use the idle FBX as the single loaded player rig/model source.
 const playerPath = animPaths.idle;
 
@@ -293,6 +314,105 @@ async function loadCharacterAndAnimations() {
     player.castShadow = true;
     scene.add(player);
   }
+}
+
+function createLandmarkTower(scale, materials) {
+  const group = new THREE.Group();
+
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.35, 8.5, 8), materials.stone);
+  shaft.position.y = 4.25;
+  shaft.castShadow = true;
+  shaft.receiveShadow = true;
+  group.add(shaft);
+
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 1.1, 10), materials.accent);
+  crown.position.y = 8.85;
+  crown.castShadow = true;
+  crown.receiveShadow = true;
+  group.add(crown);
+
+  group.scale.setScalar(scale);
+  return group;
+}
+
+function createLandmarkRuins(scale, materials) {
+  const group = new THREE.Group();
+  const blocks = [
+    { x: -2.4, z: -1.1, h: 2.8, w: 1.3, d: 1.1 },
+    { x: -0.7, z: 0.9, h: 3.4, w: 1.1, d: 1.2 },
+    { x: 1.5, z: -0.4, h: 2.4, w: 1.4, d: 1.05 },
+    { x: 2.8, z: 1.3, h: 3.1, w: 1.2, d: 1.25 }
+  ];
+
+  blocks.forEach((block, index) => {
+    const piece = new THREE.Mesh(new THREE.BoxGeometry(block.w, block.h, block.d), index % 2 === 0 ? materials.stone : materials.accent);
+    piece.position.set(block.x, block.h * 0.5, block.z);
+    piece.rotation.y = 0.1 * index;
+    piece.castShadow = true;
+    piece.receiveShadow = true;
+    group.add(piece);
+  });
+
+  const arch = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.55, 1), materials.stone);
+  arch.position.set(0.35, 3.65, 0.35);
+  arch.rotation.y = 0.12;
+  arch.castShadow = true;
+  arch.receiveShadow = true;
+  group.add(arch);
+
+  group.scale.setScalar(scale);
+  return group;
+}
+
+function createLandmarkWindmillFallback(scale, materials) {
+  const group = new THREE.Group();
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.85, 6.5, 10), materials.stone);
+  base.position.y = 3.25;
+  base.castShadow = true;
+  base.receiveShadow = true;
+  group.add(base);
+
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.9, 12), materials.accent);
+  hub.rotation.z = Math.PI * 0.5;
+  hub.position.set(0, 6.2, 0.5);
+  hub.castShadow = true;
+  hub.receiveShadow = true;
+  group.add(hub);
+
+  for (let i = 0; i < 4; i += 1) {
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.4, 0.08), materials.accent);
+    blade.position.set(0, 6.2, 0.5);
+    blade.rotation.z = (Math.PI * 0.5 * i) + Math.PI * 0.15;
+    blade.castShadow = true;
+    blade.receiveShadow = true;
+    group.add(blade);
+  }
+
+  group.scale.setScalar(scale);
+  return group;
+}
+
+function createLandmarks() {
+  const stoneMaterial = new THREE.MeshStandardMaterial({ color: 0x6c7491, roughness: 0.91, metalness: 0.03 });
+  const accentMaterial = new THREE.MeshStandardMaterial({ color: 0xb9adc8, roughness: 0.74, metalness: 0.08 });
+  const materials = { stone: stoneMaterial, accent: accentMaterial };
+
+  landmarkLayout.forEach((landmark, index) => {
+    let mesh;
+    if (landmark.type === 'tower') mesh = createLandmarkTower(landmark.scale, materials);
+    else if (landmark.type === 'ruins') mesh = createLandmarkRuins(landmark.scale, materials);
+    else mesh = createLandmarkWindmillFallback(landmark.scale, materials);
+
+    const x = landmark.position.x;
+    const z = landmark.position.y;
+    const y = getTerrainHeightAt(x, z);
+
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = 0.25 + index * 0.9;
+    mesh.name = landmark.id;
+    scene.add(mesh);
+  });
 }
 
 async function createSetDressing() {
@@ -570,6 +690,7 @@ window.addEventListener('resize', () => {
 
 loadCharacterAndAnimations().finally(async () => {
   await createSetDressing();
+  createLandmarks();
   createInteractable();
   render();
 });

@@ -186,10 +186,10 @@
     {
       "id": "T-024",
       "title": "Programmer: stage one landmark composition pass (tower + ruins + windmill fallback) with silhouette-first placement",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Use CC0 candidates first: Tower https://poly.pizza/m/iuMDwgTRMU and Modular Ruins Pack https://poly.pizza/m/F2LAK03B0r. Place 3 landmarks at near/mid/far distances from spawn to guide navigation. Keep each landmark to <=2 material variants and reuse meshes to limit draw calls."
+      "notes": "Staged first landmark composition pass directly in scene code with three silhouette-first anchors from spawn: near tower (20,-14), mid ruins (-46,24), and far windmill fallback (74,62). Each landmark uses only two shared material variants (stone/accent) with reused primitive meshes and terrain-aligned placement to keep draw/asset cost low ahead of external model import in T-022."
     },
     {
       "id": "T-025",
