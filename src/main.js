@@ -167,6 +167,11 @@ const natureKitPaths = {
   logStack: '/assets/nature-kit/log_stackLarge.glb'
 };
 
+const landmarkAssetPaths = {
+  tower: '/assets/poly-pizza/tower-quaternius.glb',
+  windmill: '/assets/poly-pizza/windmill-poly-google.glb'
+};
+
 const landmarkLayout = [
   {
     id: 'tower-near',
@@ -393,21 +398,53 @@ function createLandmarkWindmillFallback(scale, materials) {
   return group;
 }
 
-function createLandmarks() {
+async function loadLandmarkAssets() {
+  const entries = await Promise.all(
+    Object.entries(landmarkAssetPaths).map(async ([type, path]) => {
+      try {
+        const gltf = await loadGLTF(path);
+        return [type, gltf.scene];
+      } catch (error) {
+        console.warn(`Landmark asset failed to load for ${type}, using primitive fallback:`, error);
+        return [type, null];
+      }
+    })
+  );
+
+  return Object.fromEntries(entries);
+}
+
+async function createLandmarks() {
   const stoneMaterial = new THREE.MeshStandardMaterial({ color: 0x6c7491, roughness: 0.91, metalness: 0.03 });
   const accentMaterial = new THREE.MeshStandardMaterial({ color: 0xb9adc8, roughness: 0.74, metalness: 0.08 });
   const materials = { stone: stoneMaterial, accent: accentMaterial };
+  const landmarkAssets = await loadLandmarkAssets();
 
   landmarkLayout.forEach((landmark, index) => {
     let mesh;
-    if (landmark.type === 'tower') mesh = createLandmarkTower(landmark.scale, materials);
-    else if (landmark.type === 'ruins') mesh = createLandmarkRuins(landmark.scale, materials);
-    else mesh = createLandmarkWindmillFallback(landmark.scale, materials);
+    const importedAsset = landmarkAssets[landmark.type];
+
+    if (importedAsset) {
+      mesh = importedAsset.clone(true);
+      mesh.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+    } else if (landmark.type === 'tower') {
+      mesh = createLandmarkTower(landmark.scale, materials);
+    } else if (landmark.type === 'ruins') {
+      mesh = createLandmarkRuins(landmark.scale, materials);
+    } else {
+      mesh = createLandmarkWindmillFallback(landmark.scale, materials);
+    }
 
     const x = landmark.position.x;
     const z = landmark.position.y;
     const y = getTerrainHeightAt(x, z);
 
+    mesh.scale.multiplyScalar(landmark.scale);
     mesh.position.set(x, y, z);
     mesh.rotation.y = 0.25 + index * 0.9;
     mesh.name = landmark.id;
@@ -690,7 +727,7 @@ window.addEventListener('resize', () => {
 
 loadCharacterAndAnimations().finally(async () => {
   await createSetDressing();
-  createLandmarks();
+  await createLandmarks();
   createInteractable();
   render();
 });

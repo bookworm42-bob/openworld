@@ -171,10 +171,10 @@
     {
       "id": "T-022",
       "title": "Asset integration: add 2-3 low-poly landmark props (windmill/ruin/tower) from Poly Pizza with explicit per-model license notes",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Primary candidates (Poly Pizza): Tower by Quaternius https://poly.pizza/m/iuMDwgTRMU (Public Domain CC0), Modular Ruins Pack by Quaternius https://poly.pizza/m/F2LAK03B0r (Public Domain CC0), Windmill by Poly by Google https://poly.pizza/m/ctIRaIM3zXu (Creative Commons Attribution 3.0; requires attribution). Prefer CC0 set first to avoid attribution overhead. Keep added gzip payload under ~300KB and document final model licenses in docs/assets-license-notes.md."
+      "notes": "Imported two Poly Pizza landmark GLBs into public/assets/poly-pizza (Tower CC0 + Windmill CC BY 3.0) and wired them into landmark spawning with primitive fallbacks preserved for robustness. Added docs/assets-license-notes.md with source URL + exact license strings + explicit attribution text for CC BY windmill. Deferred Modular Ruins Pack this pass because its GLB payload is too large for the ~300KB gzip budget target."
     },
     {
       "id": "T-023",
