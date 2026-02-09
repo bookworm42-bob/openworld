@@ -113,3 +113,17 @@ GitHub Actions build check runs on push/PR using:
 
 - `npm ci`
 - `npm run build`
+
+## Performance budget tracking
+
+Run a build with budget checks:
+
+```bash
+npm run build:budget
+```
+
+Current gzip budgets enforced by `scripts/check-bundle-budget.cjs`:
+
+- JS bundles: 320 KB
+- CSS bundles: 32 KB
+- Static assets (`.glb`, `.fbx`, images): 420 KB

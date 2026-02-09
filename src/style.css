@@ -99,3 +99,17 @@ canvas {
   padding: 8px 10px;
   backdrop-filter: blur(3px);
 }
+
+#landmark-hud {
+  position: fixed;
+  left: 12px;
+  top: 52px;
+  z-index: 12;
+  font-size: 12px;
+  color: #ffe6d2;
+  background: rgba(36, 18, 30, 0.62);
+  border: 1px solid rgba(251, 187, 173, 0.35);
+  border-radius: 10px;
+  padding: 8px 10px;
+  backdrop-filter: blur(3px);
+}

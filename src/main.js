@@ -28,12 +28,12 @@ scene.background = new THREE.Color(TWILIGHT5.night);
 scene.fog = new THREE.Fog(TWILIGHT5.deepIndigo, 24, 106);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
-camera.position.set(0, 4, 9);
+camera.position.set(-1.2, 3.2, 8.6);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.target.set(0, 1.25, 0);
-controls.maxPolarAngle = Math.PI * 0.48;
+controls.target.set(5.5, 1.02, -3.8);
+controls.maxPolarAngle = Math.PI * 0.47;
 controls.minDistance = 3;
 controls.maxDistance = 18;
 
@@ -43,6 +43,44 @@ dirLight.position.set(8, 16, 6);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
 scene.add(dirLight);
+
+function createSunDiscSprite() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const gradient = ctx.createRadialGradient(size * 0.5, size * 0.5, size * 0.04, size * 0.5, size * 0.5, size * 0.5);
+  gradient.addColorStop(0, 'rgba(251, 187, 173, 0.9)');
+  gradient.addColorStop(0.35, 'rgba(238, 134, 149, 0.52)');
+  gradient.addColorStop(0.72, 'rgba(74, 122, 150, 0.18)');
+  gradient.addColorStop(1, 'rgba(41, 40, 49, 0)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      fog: false,
+      opacity: 0.78
+    })
+  );
+
+  sprite.position.set(-64, 24, -128);
+  sprite.scale.set(42, 42, 1);
+  sprite.renderOrder = -20;
+  scene.add(sprite);
+}
+
+createSunDiscSprite();
 
 const TERRAIN_CHUNK_SIZE = 110;
 const TERRAIN_CHUNK_SEGMENTS = 45;
@@ -144,7 +182,12 @@ function applyDistanceGroundBlend(material) {
       float distFade = smoothstep(uGroundBlendNear, uGroundBlendFar, distance(vGroundWorldPos.xz, uGroundCameraPos.xz));
       vec3 distanceTint = mix(vec3(1.04, 1.02, 1.0), vec3(0.86, 0.82, 0.88), distFade);
       vec3 groundTex = mix(grassTex, dirtTex, distFade);
-      gl_FragColor.rgb *= groundTex * distanceTint * 1.18;
+
+      // Keep the terrain stylized (less photoreal) by compressing tonal range + light posterization.
+      vec3 stylizedGround = mix(vec3(0.5), groundTex, 0.72);
+      stylizedGround = floor(stylizedGround * 5.0) / 5.0;
+
+      gl_FragColor.rgb *= stylizedGround * distanceTint * 1.1;
       #include <dithering_fragment>
       `
     );
@@ -255,6 +298,12 @@ const gravity = 26;
 const jumpVelocity = 9;
 let groundedY = 0;
 
+const spawnFraming = {
+  elapsed: 0,
+  duration: 1.0,
+  targetOffset: new THREE.Vector3(5.5, -0.2, -3.8)
+};
+
 const interactable = {
   mesh: null,
   radius: 2.2,
@@ -270,6 +319,12 @@ const modeHud = {
 const chunkHud = {
   el: null
 };
+
+const landmarkHud = {
+  el: null
+};
+
+const runtimeLandmarks = [];
 
 const animPaths = {
   idle: idleFbxUrl,
@@ -451,12 +506,16 @@ async function loadCharacterAndAnimations() {
 
     setAction('idle', 0.01);
 
-    // Reframe camera once character bounds are known.
+    // Reframe camera once character bounds are known with horizon-first spawn composition.
     const box = new THREE.Box3().setFromObject(player);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    controls.target.copy(center);
-    camera.position.set(center.x + 3.2, center.y + 2.2, center.z + 5.8);
+    controls.target.set(
+      center.x + spawnFraming.targetOffset.x,
+      center.y + 1.0 + spawnFraming.targetOffset.y,
+      center.z + spawnFraming.targetOffset.z
+    );
+    camera.position.set(center.x - 1.3, center.y + 2.15, center.z + 8.1);
   } catch (error) {
     console.error('Failed to load model/animations from ./3d_models/boy:', error);
 
@@ -604,6 +663,7 @@ async function createLandmarks() {
     mesh.rotation.y = 0.25 + index * 0.9;
     mesh.name = landmark.id;
     scene.add(mesh);
+    runtimeLandmarks.push({ id: landmark.id, position: mesh.position });
   });
 }
 
@@ -625,6 +685,12 @@ async function createSetDressing() {
     { x: -35, z: 19, scale: 1.2, rotation: -0.2, type: 'brokenFencePillar' },
     { x: 33, z: 24, scale: 0.95, rotation: 0.1, type: 'damagedGrave' },
     { x: 58, z: 46, scale: 1.15, rotation: -0.55, type: 'brokenFencePillar' }
+  ];
+
+  const silhouetteBeaconAnchors = [
+    { x: 68, z: 58, scale: 1.48, rotation: -0.35, type: 'tree' },
+    { x: 64, z: 53, scale: 1.02, rotation: 0.55, type: 'brokenFencePillar' },
+    { x: 73, z: 62, scale: 0.9, rotation: -0.9, type: 'brokenFencePillar' }
   ];
 
   try {
@@ -696,6 +762,12 @@ async function createSetDressing() {
       if (!source) return;
       placeNatureProp(source, anchor);
     });
+
+    silhouetteBeaconAnchors.forEach((anchor) => {
+      const source = anchor.type === 'tree' ? treeGltf : ruinAccentSources[anchor.type];
+      if (!source) return;
+      placeNatureProp(source, anchor);
+    });
   } catch (error) {
     console.warn('Nature Kit/ruin props failed to load, using primitive fallback:', error);
 
@@ -721,6 +793,10 @@ async function createSetDressing() {
 
     ruinAccentAnchors.forEach((anchor) => {
       placeFallback({ ...anchor, scale: anchor.scale * 0.7 });
+    });
+
+    silhouetteBeaconAnchors.forEach((anchor, index) => {
+      placeFallback({ ...anchor, scale: anchor.scale * (anchor.type === 'tree' ? 0.95 : 0.7), rotation: anchor.rotation + index * 0.08 });
     });
   }
 }
@@ -768,6 +844,11 @@ function createInteractable() {
   chunkHud.el.id = 'chunk-hud';
   document.body.appendChild(chunkHud.el);
   updateChunkHud();
+
+  landmarkHud.el = document.createElement('div');
+  landmarkHud.el.id = 'landmark-hud';
+  document.body.appendChild(landmarkHud.el);
+  updateLandmarkHud();
 }
 
 function updateInteractionUI(canInteract) {
@@ -821,6 +902,29 @@ function updateChunkHud() {
   const referencePosition = player ? player.position : camera.position;
   const playerChunk = formatPlayerChunkIndex(referencePosition);
   chunkHud.el.textContent = `Chunks: ${activeChunks}/${terrainChunks.length} · Player chunk: ${playerChunk}`;
+}
+
+function updateLandmarkHud() {
+  if (!landmarkHud.el || runtimeLandmarks.length === 0) return;
+
+  const referencePosition = player ? player.position : camera.position;
+  let nearest = null;
+
+  runtimeLandmarks.forEach((landmark) => {
+    const distance = referencePosition.distanceTo(landmark.position);
+    if (!nearest || distance < nearest.distance) {
+      nearest = { id: landmark.id, distance };
+    }
+  });
+
+  const visibleCount = runtimeLandmarks.reduce((count, landmark) => {
+    const vector = landmark.position.clone().sub(camera.position);
+    const inFront = vector.dot(camera.getWorldDirection(new THREE.Vector3())) > 0;
+    return count + (inFront ? 1 : 0);
+  }, 0);
+
+  if (!nearest) return;
+  landmarkHud.el.textContent = `Landmarks in view: ${visibleCount}/${runtimeLandmarks.length} · Nearest: ${nearest.id} (${Math.round(nearest.distance)}m)`;
 }
 
 function onKey(isDown, e) {
@@ -891,8 +995,14 @@ function updatePlayer(delta) {
     player.position.y = groundedY;
   }
 
-  // soft camera follow
+  // soft camera follow + first-second spawn framing bias toward horizon/landmark lane
+  spawnFraming.elapsed = Math.min(spawnFraming.elapsed + delta, spawnFraming.duration);
+  const spawnInfluence = 1 - (spawnFraming.elapsed / spawnFraming.duration);
+
   const desiredTarget = player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+  if (spawnInfluence > 0) {
+    desiredTarget.addScaledVector(spawnFraming.targetOffset, spawnInfluence);
+  }
   controls.target.lerp(desiredTarget, 1 - Math.pow(0.001, delta));
 
   if (interactable.mesh) {
@@ -919,6 +1029,7 @@ function render() {
     material.userData?.groundBlendShader?.uniforms?.uGroundCameraPos?.value.copy(camera.position);
   });
   updateChunkHud();
+  updateLandmarkHud();
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(render);

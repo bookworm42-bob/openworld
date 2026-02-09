@@ -35,6 +35,14 @@
 - Added gzip estimate (level 9): **36,225 bytes total delta**
 - Result: within T-033 budget constraint (<= 60 KB gzip delta).
 
+### Payload impact (T-042 silhouette beacon pass)
+- Newly placed silhouettes reuse already-imported assets only:
+  - `public/assets/nature-kit/tree_oak.glb` (Kenney Nature Kit CC0)
+  - `public/assets/poly-pizza/broken-fence-pillar-kay-lousberg.glb` (Poly Pizza CC0)
+- New imported files: **none**
+- Build payload delta attributable to T-042 imports: **0 bytes raw / 0 bytes gzip**
+- Result: within T-042 budget constraint (<= 80 KB gzip delta).
+
 ## Deferred candidate (not imported)
 
 ### Modular Ruins Pack — Quaternius
