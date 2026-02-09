@@ -231,6 +231,30 @@
       "size": "small",
       "milestone": "v2",
       "notes": "Using ?slow=1, capture spawn/mid/far screenshots before and after T-027. Score 1-5 for (a) player silhouette against terrain, (b) landmark recognizability at spawn, (c) horizon separation through fog. Reference currently used assets: Kenney Nature Kit CC0 https://kenney.nl/assets/nature-kit and Poly Pizza windmill CC BY 3.0 https://poly.pizza/m/ctIRaIM3zXu (ensure attribution remains visible in docs)."
+    },
+    {
+      "id": "T-030",
+      "title": "Programmer: add 1 lightweight CC0 ground material set (dirt + grass) and wire distance fade blend",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Source candidate: Poly Haven textures (CC0, attribution not required) https://polyhaven.com/license. Implement as two compressed tiling maps (<=512px each) with shader/lerp blend tied to camera distance; keep added gzip payload under ~120KB and preserve current stylized dusk palette."
+    },
+    {
+      "id": "T-031",
+      "title": "Reviewer: verify new material pass keeps stylized cohesion and budget",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Check that added ground textures do not push scene toward photoreal mismatch against low-poly props. Confirm build-size delta and that far-distance fog/horizon readability remains equal or better than T-029 baseline. License note must cite Poly Haven CC0 https://polyhaven.com/license in docs/assets-license-notes.md if assets are imported."
+    },
+    {
+      "id": "T-032",
+      "title": "Playtest: run golden-hour readability sweep after material blend pass",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "In ?slow=1 mode capture spawn/mid/far screenshots plus one landmark-approach frame. Score 1-5 for player silhouette contrast, landmark edge separation, and terrain noise distraction. Pass only if readability score average >=4 and no new aliasing shimmer appears while moving."
     }
   ]
 }
