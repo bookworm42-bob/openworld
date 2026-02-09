@@ -162,10 +162,10 @@
     {
       "id": "T-021",
       "title": "Art pass: shift terrain + fog to a cohesive dusk palette and add subtle distance color grading",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Target look: stylized dusk-adventure with cool shadows + warm key light. Implement by tuning scene fog/sky/hemisphere colors and terrain vertex-color endpoints for stronger foreground-background separation."
+      "notes": "Shifted scene to a dusk look: updated sky/background gradient, cooler hemisphere light + warmer key directional light, retuned fog near/far/color, and moved terrain/contour vertex colors toward cool-foreground to warm-distant separation."
     },
     {
       "id": "T-022",

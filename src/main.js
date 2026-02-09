@@ -16,7 +16,8 @@ renderer.shadowMap.enabled = true;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x3f4f7a, 32, 118);
+scene.background = new THREE.Color(0x1f2238);
+scene.fog = new THREE.Fog(0x36395a, 24, 106);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
 camera.position.set(0, 4, 9);
@@ -28,8 +29,8 @@ controls.maxPolarAngle = Math.PI * 0.48;
 controls.minDistance = 3;
 controls.maxDistance = 18;
 
-scene.add(new THREE.HemisphereLight(0xbad4ff, 0x47604d, 0.82));
-const dirLight = new THREE.DirectionalLight(0xffd6ab, 1.05);
+scene.add(new THREE.HemisphereLight(0x8aa0d6, 0x2f3349, 0.9));
+const dirLight = new THREE.DirectionalLight(0xffb677, 1.12);
 dirLight.position.set(8, 16, 6);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
@@ -47,8 +48,8 @@ function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments
 
   const positions = terrainGeometry.attributes.position;
   const colors = [];
-  const lowColor = new THREE.Color(0x2f5a4c);
-  const highColor = new THREE.Color(0x7e9f6d);
+  const lowColor = new THREE.Color(0x33476b);
+  const highColor = new THREE.Color(0x8b7a98);
   const tint = new THREE.Color();
 
   for (let i = 0; i < positions.count; i += 1) {
@@ -86,7 +87,7 @@ function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments
   const contourOverlay = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size, 16, 16),
     new THREE.MeshBasicMaterial({
-      color: 0xc2d8ab,
+      color: 0xb8a9d6,
       wireframe: true,
       transparent: true,
       opacity: 0.07

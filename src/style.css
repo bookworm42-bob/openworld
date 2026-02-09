@@ -13,7 +13,7 @@ body,
 
 body {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: linear-gradient(180deg, #6eb7ff 0%, #a4d6ff 35%, #e5f4ff 100%);
+  background: linear-gradient(180deg, #1d2033 0%, #3a3f63 42%, #7f5a73 78%, #e39a6f 100%);
 }
 
 canvas {
