@@ -207,6 +207,30 @@
       "size": "small",
       "milestone": "v2",
       "notes": "In ?slow=1 mode, walk a fixed route toward each landmark and capture 3 screenshots per landmark distance bucket. Fail criteria: player silhouette blends into fog/terrain or landmark not visible from spawn within 5 seconds of camera scan."
+    },
+    {
+      "id": "T-027",
+      "title": "Programmer: apply Twilight-5-driven dusk grade and landmark rim-light accents for silhouette readability",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Map current sky/fog/terrain colors to a restrained 5-color dusk ramp inspired by Lospec Twilight 5 (#fbbbad #ee8695 #4a7a96 #333f58 #292831): https://lospec.com/palette-list/twilight-5. Keep existing stylized look (not photoreal), add subtle warm rim accent on landmark-facing normals only, and keep fog distance unchanged initially for A/B screenshots."
+    },
+    {
+      "id": "T-028",
+      "title": "Reviewer: verify candidate ruins asset pack feasibility (license + payload budget) before import",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Audit Modular Ruins Pack candidate https://poly.pizza/m/F2LAK03B0r (listed as Public Domain CC0) against existing landmark assets and gzip budget. Confirm source URL, exact license text, and estimated compressed payload delta before merge; if over budget, require selective extraction (1-2 pieces only) and document decision in docs/assets-license-notes.md."
+    },
+    {
+      "id": "T-029",
+      "title": "Playtest: run dusk readability route after palette update and score silhouette/horizon clarity",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Using ?slow=1, capture spawn/mid/far screenshots before and after T-027. Score 1-5 for (a) player silhouette against terrain, (b) landmark recognizability at spawn, (c) horizon separation through fog. Reference currently used assets: Kenney Nature Kit CC0 https://kenney.nl/assets/nature-kit and Poly Pizza windmill CC BY 3.0 https://poly.pizza/m/ctIRaIM3zXu (ensure attribution remains visible in docs)."
     }
   ]
 }
