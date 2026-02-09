@@ -79,6 +79,21 @@
       "size": "small",
       "milestone": "v1",
       "notes": "Committed runtime + CI + validation scripts/artifacts and pushed to origin/main."
+    },
+    {
+      "id": "T-011",
+      "title": "Add simple ground-plane terrain placeholder variations (color + subtle height illusion)",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Replaced flat floor with a subdivided terrain plane using subtle procedural undulation + per-vertex grass color variation, plus a faint wireframe contour overlay for readability."
+    },
+    {
+      "id": "T-012",
+      "title": "Implement basic gravity + floor collision lock for player movement",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v1"
     }
   ]
 }
