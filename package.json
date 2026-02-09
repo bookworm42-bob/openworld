@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:budget": "vite build && node scripts/check-bundle-budget.cjs",
+    "preview": "vite preview",
+    "playtest:readability": "node scripts/playtest-readability-screens.cjs",
+    "playtest:spawn-framing": "node scripts/playtest-spawn-framing-screens.cjs",
+    "playtest:horizon-guidance": "node scripts/playtest-horizon-guidance-sweep.cjs"
   },
   "dependencies": {
     "three": "^0.174.0"

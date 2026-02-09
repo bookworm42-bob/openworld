@@ -195,10 +195,10 @@
     {
       "id": "T-025",
       "title": "Reviewer: validate asset-license ledger + art-style cohesion for newly imported landmarks",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Check docs/assets-license-notes.md includes source URL + exact license string per model (CC0 vs CC-BY). If any CC-BY model (e.g., Windmill https://poly.pizza/m/ctIRaIM3zXu) is used, verify attribution text is present in-project. Confirm landmarks read as stylized/low-poly and do not clash with character proportions."
+      "notes": "Completed reviewer audit: docs/assets-license-notes.md includes source URL + exact license string for each imported landmark (Tower CC0, Windmill CC BY 3.0, Damaged Grave CC0, Broken Fence Pillar CC0) and includes explicit in-project attribution text for Windmill. Visual cohesion check against current runtime placement/scale passed: landmark silhouettes remain stylized low-poly and proportionate to the player/world composition."
     },
     {
       "id": "T-026",
@@ -307,18 +307,18 @@
     {
       "id": "T-039",
       "title": "Programmer: lock spawn camera to horizon-first framing and add subtle sun-disc gradient cue",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Current spawn framing can open on mostly sky; set initial camera pitch/target clamp so terrain + one landmark are visible within first second. Add a lightweight sky sun-disc/radial gradient (shader or sprite, no HDRI) using Twilight-5 anchors (#fbbbad #ee8695 #4a7a96 #333f58 #292831, https://lospec.com/palette-list/twilight-5). Keep GPU cost negligible and preserve fog readability."
+      "notes": "Implemented horizon-first spawn framing by shifting initial camera/OrbitControls target toward the tower lane and adding a first-second target bias that decays to normal follow. Added a lightweight CanvasTexture sun-disc sprite (Twilight-5 colors) in far sky with depthTest/depthWrite disabled to keep GPU cost low and avoid fog/readability regressions."
     },
     {
       "id": "T-040",
       "title": "Reviewer: verify first-5-seconds composition readability after spawn-framing pass",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Capture 3 deterministic spawn screenshots (0s/2s/5s) in ?slow=1 and score 1-5 for: horizon balance, player silhouette contrast, and immediate landmark discoverability. Pass criteria: average >=4 and at least one landmark clearly legible at 0-2s without camera spin."
+      "notes": "Captured deterministic spawn frames at 0s/2s/5s in ?slow=1 via scripts/playtest-spawn-framing-screens.cjs and generated artifacts/spawn-framing-{0s,2s,5s}.png plus artifacts/spawn-framing-check-report.md. Scored horizon balance, silhouette contrast, and landmark discoverability at 4/5 each (avg 4.0), meeting pass criteria."
     },
     {
       "id": "T-041",
@@ -331,18 +331,18 @@
     {
       "id": "T-042",
       "title": "Programmer: add a silhouette beacon set (1 dead tree + 2 broken-stone accents) along the far-lane horizon",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Import up to 3 lightweight props and place as a single composition cluster to strengthen horizon readability: reuse an existing Kenney Nature Kit tree silhouette (CC0 https://kenney.nl/assets/nature-kit) plus Broken Fence Pillar CC0 https://poly.pizza/m/8RXyLygEeF (reuse existing where possible). Keep added compressed payload <= 80KB gzip and preserve primitive fallback if any model fails to load."
+      "notes": "Placed a far-lane silhouette beacon cluster using already-loaded assets only: 1 tree silhouette + 2 Broken Fence Pillar accents at x/z ~ (68,58)/(64,53)/(73,62) to guide horizon reads toward the windmill lane. No new model imports (0 payload delta); preserved primitive fallback path for all three anchors. npm run build passes."
     },
     {
       "id": "T-043",
       "title": "Reviewer: audit silhouette beacon pass for style cohesion, license ledger, and perf budget",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Verify docs/assets-license-notes.md includes exact source URL + license string for each newly referenced model (target: CC0 on Poly Pizza entries). Confirm added beacons improve horizon guidance without competing against primary landmarks, and check build-size delta remains within the <= 80KB gzip target from T-042."
+      "notes": "Audit complete: license ledger already includes exact source URL + CC0 license strings for the Poly Pizza model used by beacon accents (Broken Fence Pillar), and Kenney tree asset remains covered by existing Nature Kit CC0 source. Added explicit T-042 payload section in docs/assets-license-notes.md confirming silhouette beacon pass reused existing imports only (0 bytes raw / 0 bytes gzip delta), which is within the <=80KB gzip target."
     },
     {
       "id": "T-044",
@@ -351,6 +351,14 @@
       "size": "small",
       "milestone": "v2",
       "notes": "In ?slow=1, capture 5 frames (spawn 0s, spawn 5s, mid-lane 30s, far-lane 60s, near-beacon 80s) and score 1-5 for horizon guidance clarity, player silhouette readability, and landmark priority. Pass if average >=4 and no new visual clutter causes navigation hesitation >3 seconds."
+    },
+    {
+      "id": "T-045",
+      "title": "Programmer: add lightweight bundle-budget guardrail script for JS/CSS/static asset gzip totals",
+      "status": "done",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Implemented scripts/check-bundle-budget.cjs and wired npm run build:budget (vite build + budget validation). Added README section with thresholds (JS 320KB, CSS 32KB, static assets 420KB gzip). Build validated in this run."
     }
   ]
 }
