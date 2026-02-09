@@ -123,10 +123,18 @@
     {
       "id": "T-016",
       "title": "Establish first art-direction pass: mood/palette/prop style and 2-3 asset candidates",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Completed first art-direction pass: documented mood/palette/prop style and 3 CC0 asset candidates in docs/art-direction-pass-01.md; implemented dusk palette tuning + lightweight set-dressing prop clusters in scene for immediate visual coherence."
+    },
+    {
+      "id": "T-017",
+      "title": "Replace primitive set-dressing cluster with 1 imported CC0 nature-kit asset bundle (optimized glTF) and measure build size delta",
       "status": "ready",
       "size": "small",
       "milestone": "v1",
-      "notes": "Driven by art-direction cron; include sources and license notes for any proposed assets."
+      "notes": "Start with Kenney Nature Kit (https://kenney.nl/assets/nature-kit, CC0). Keep asset payload minimal and record compressed size impact in notes."
     }
   ]
 }

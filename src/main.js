@@ -15,7 +15,7 @@ renderer.shadowMap.enabled = true;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xd9efff, 35, 120);
+scene.fog = new THREE.Fog(0x3f4f7a, 32, 118);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
 camera.position.set(0, 4, 9);
@@ -27,8 +27,8 @@ controls.maxPolarAngle = Math.PI * 0.48;
 controls.minDistance = 3;
 controls.maxDistance = 18;
 
-scene.add(new THREE.HemisphereLight(0xdaf0ff, 0x7ec98d, 0.9));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
+scene.add(new THREE.HemisphereLight(0xbad4ff, 0x47604d, 0.82));
+const dirLight = new THREE.DirectionalLight(0xffd6ab, 1.05);
 dirLight.position.set(8, 16, 6);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
@@ -39,8 +39,8 @@ terrainGeometry.rotateX(-Math.PI / 2);
 
 const positions = terrainGeometry.attributes.position;
 const colors = [];
-const lowColor = new THREE.Color(0x377f4f);
-const highColor = new THREE.Color(0x5cab72);
+const lowColor = new THREE.Color(0x2f5a4c);
+const highColor = new THREE.Color(0x7e9f6d);
 const tint = new THREE.Color();
 
 for (let i = 0; i < positions.count; i += 1) {
@@ -75,7 +75,7 @@ scene.add(floor);
 const contourOverlay = new THREE.Mesh(
   new THREE.PlaneGeometry(220, 220, 30, 30),
   new THREE.MeshBasicMaterial({
-    color: 0x9fdb9f,
+    color: 0xc2d8ab,
     wireframe: true,
     transparent: true,
     opacity: 0.07
@@ -242,6 +242,43 @@ async function loadCharacterAndAnimations() {
   }
 }
 
+function createSetDressing() {
+  const rockMaterial = new THREE.MeshStandardMaterial({
+    color: 0x6c6f7f,
+    roughness: 0.9,
+    metalness: 0.03
+  });
+  const ruinMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8b7b67,
+    roughness: 0.85,
+    metalness: 0.02
+  });
+
+  const propAnchors = [
+    { x: -6.5, z: -4.2, scale: 1.2 },
+    { x: 7.4, z: 4.6, scale: 0.9 },
+    { x: -9.2, z: 6.8, scale: 1.05 }
+  ];
+
+  propAnchors.forEach((anchor, index) => {
+    const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 1.1, 6), ruinMaterial);
+    stump.position.set(anchor.x, getTerrainHeightAt(anchor.x, anchor.z) + 0.55, anchor.z);
+    stump.scale.setScalar(anchor.scale);
+    stump.rotation.y = index * 0.7;
+    stump.castShadow = true;
+    stump.receiveShadow = true;
+    scene.add(stump);
+
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45, 0), rockMaterial);
+    rock.position.set(anchor.x + 0.85, getTerrainHeightAt(anchor.x + 0.85, anchor.z + 0.35) + 0.3, anchor.z + 0.35);
+    rock.rotation.set(0.2 * index, 0.45, -0.15 * index);
+    rock.scale.set(anchor.scale * 0.9, anchor.scale * 0.75, anchor.scale * 0.95);
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    scene.add(rock);
+  });
+}
+
 function createInteractable() {
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(0.45, 0.6, 0.25, 24),
@@ -253,8 +290,8 @@ function createInteractable() {
   const orb = new THREE.Mesh(
     new THREE.SphereGeometry(0.38, 24, 24),
     new THREE.MeshStandardMaterial({
-      color: 0x66d8ff,
-      emissive: 0x1f8fff,
+      color: 0x9ed6ff,
+      emissive: 0x4b7fd3,
       emissiveIntensity: 0.7,
       roughness: 0.25,
       metalness: 0.12
@@ -294,8 +331,8 @@ function triggerInteraction() {
   interactable.activated = !interactable.activated;
   const orb = interactable.mesh.children[0];
   if (orb?.material) {
-    orb.material.color.setHex(interactable.activated ? 0x7dffb5 : 0x66d8ff);
-    orb.material.emissive.setHex(interactable.activated ? 0x1ba653 : 0x1f8fff);
+    orb.material.color.setHex(interactable.activated ? 0xb5ffc8 : 0x9ed6ff);
+    orb.material.emissive.setHex(interactable.activated ? 0x2b965f : 0x4b7fd3);
   }
 
   interactable.statusEl.textContent = interactable.activated
@@ -414,6 +451,7 @@ window.addEventListener('resize', () => {
 });
 
 loadCharacterAndAnimations().finally(() => {
+  createSetDressing();
   createInteractable();
   render();
 });
