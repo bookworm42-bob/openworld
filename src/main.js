@@ -35,56 +35,79 @@ dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
 scene.add(dirLight);
 
-const terrainGeometry = new THREE.PlaneGeometry(220, 220, 90, 90);
-terrainGeometry.rotateX(-Math.PI / 2);
+const TERRAIN_CHUNK_SIZE = 110;
+const TERRAIN_CHUNK_SEGMENTS = 45;
+const TERRAIN_VISIBILITY_DISTANCE = 125;
 
-const positions = terrainGeometry.attributes.position;
-const colors = [];
-const lowColor = new THREE.Color(0x2f5a4c);
-const highColor = new THREE.Color(0x7e9f6d);
-const tint = new THREE.Color();
+const terrainChunks = [];
 
-for (let i = 0; i < positions.count; i += 1) {
-  const x = positions.getX(i);
-  const z = positions.getZ(i);
+function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments = TERRAIN_CHUNK_SEGMENTS) {
+  const terrainGeometry = new THREE.PlaneGeometry(size, size, segments, segments);
+  terrainGeometry.rotateX(-Math.PI / 2);
 
-  const rolling = Math.sin(x * 0.07) * Math.cos(z * 0.05) * 0.12;
-  const patchNoise = Math.sin((x + z) * 0.18) * 0.04;
-  const y = rolling + patchNoise;
+  const positions = terrainGeometry.attributes.position;
+  const colors = [];
+  const lowColor = new THREE.Color(0x2f5a4c);
+  const highColor = new THREE.Color(0x7e9f6d);
+  const tint = new THREE.Color();
 
-  positions.setY(i, y);
+  for (let i = 0; i < positions.count; i += 1) {
+    const localX = positions.getX(i);
+    const localZ = positions.getZ(i);
+    const worldX = localX + centerX;
+    const worldZ = localZ + centerZ;
 
-  const blend = THREE.MathUtils.clamp((y + 0.16) / 0.32, 0, 1);
-  tint.copy(lowColor).lerp(highColor, blend);
-  colors.push(tint.r, tint.g, tint.b);
+    const rolling = Math.sin(worldX * 0.07) * Math.cos(worldZ * 0.05) * 0.12;
+    const patchNoise = Math.sin((worldX + worldZ) * 0.18) * 0.04;
+    const y = rolling + patchNoise;
+
+    positions.setY(i, y);
+
+    const blend = THREE.MathUtils.clamp((y + 0.16) / 0.32, 0, 1);
+    tint.copy(lowColor).lerp(highColor, blend);
+    colors.push(tint.r, tint.g, tint.b);
+  }
+
+  terrainGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  terrainGeometry.computeVertexNormals();
+
+  const floor = new THREE.Mesh(
+    terrainGeometry,
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.94,
+      metalness: 0.02
+    })
+  );
+  floor.position.set(centerX, 0, centerZ);
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  const contourOverlay = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size, 16, 16),
+    new THREE.MeshBasicMaterial({
+      color: 0xc2d8ab,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.07
+    })
+  );
+  contourOverlay.rotation.x = -Math.PI / 2;
+  contourOverlay.position.set(centerX, 0.025, centerZ);
+  scene.add(contourOverlay);
+
+  terrainChunks.push({
+    center: new THREE.Vector2(centerX, centerZ),
+    floor,
+    contourOverlay
+  });
 }
 
-terrainGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-terrainGeometry.computeVertexNormals();
-
-const floor = new THREE.Mesh(
-  terrainGeometry,
-  new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: 0.94,
-    metalness: 0.02
-  })
-);
-floor.receiveShadow = true;
-scene.add(floor);
-
-const contourOverlay = new THREE.Mesh(
-  new THREE.PlaneGeometry(220, 220, 30, 30),
-  new THREE.MeshBasicMaterial({
-    color: 0xc2d8ab,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.07
-  })
-);
-contourOverlay.rotation.x = -Math.PI / 2;
-contourOverlay.position.y = 0.025;
-scene.add(contourOverlay);
+const halfChunk = TERRAIN_CHUNK_SIZE * 0.5;
+buildTerrainChunk(-halfChunk, -halfChunk);
+buildTerrainChunk(halfChunk, -halfChunk);
+buildTerrainChunk(-halfChunk, halfChunk);
+buildTerrainChunk(halfChunk, halfChunk);
 
 const loader = new FBXLoader();
 const gltfLoader = new GLTFLoader();
@@ -146,6 +169,17 @@ function getTerrainHeightAt(x, z) {
   const rolling = Math.sin(x * 0.07) * Math.cos(z * 0.05) * 0.12;
   const patchNoise = Math.sin((x + z) * 0.18) * 0.04;
   return rolling + patchNoise;
+}
+
+function updateTerrainChunkVisibility() {
+  const referencePosition = player ? player.position : camera.position;
+  terrainChunks.forEach((chunk) => {
+    const dx = referencePosition.x - chunk.center.x;
+    const dz = referencePosition.z - chunk.center.y;
+    const isVisible = Math.hypot(dx, dz) <= TERRAIN_VISIBILITY_DISTANCE;
+    chunk.floor.visible = isVisible;
+    chunk.contourOverlay.visible = isVisible;
+  });
 }
 
 function setAction(nextName, fade = 0.2) {
@@ -487,6 +521,7 @@ function render() {
   const scaledDelta = delta * timeScale;
   if (mixer) mixer.update(scaledDelta);
   updatePlayer(scaledDelta);
+  updateTerrainChunkVisibility();
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(render);

@@ -139,9 +139,10 @@
     {
       "id": "T-018",
       "title": "Prototype 2-4 terrain chunks with distance-based visibility toggle",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v2"
+      "milestone": "v2",
+      "notes": "Split terrain into 4 procedural chunks (2x2 grid) and added runtime distance-based visibility culling per chunk for both floor + contour overlays using player/camera position."
     },
     {
       "id": "T-019",
