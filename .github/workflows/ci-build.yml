@@ -5,13 +5,14 @@ on:
     branches:
       - main
       - 'feat/**'
-      - 'chore/**'
-      - 'fix/**'
   pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
