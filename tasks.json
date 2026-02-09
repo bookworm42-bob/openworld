@@ -211,10 +211,10 @@
     {
       "id": "T-027",
       "title": "Programmer: apply Twilight-5-driven dusk grade and landmark rim-light accents for silhouette readability",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Map current sky/fog/terrain colors to a restrained 5-color dusk ramp inspired by Lospec Twilight 5 (#fbbbad #ee8695 #4a7a96 #333f58 #292831): https://lospec.com/palette-list/twilight-5. Keep existing stylized look (not photoreal), add subtle warm rim accent on landmark-facing normals only, and keep fog distance unchanged initially for A/B screenshots."
+      "notes": "Applied Twilight-5 palette mapping in runtime: scene background/fog + hemisphere/directional lights + terrain vertex ramp + contour tint now use #fbbbad/#ee8695/#4a7a96/#333f58/#292831 while preserving existing fog near/far distances (24/106). Added subtle warm rim accent shader patch (onBeforeCompile) for landmark materials only (primitive and imported GLB landmark meshes) to improve silhouette readability without changing non-landmark assets. npm run build passes."
     },
     {
       "id": "T-028",

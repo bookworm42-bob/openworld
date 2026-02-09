@@ -15,9 +15,17 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 app.appendChild(renderer.domElement);
 
+const TWILIGHT5 = {
+  blush: 0xfbbbad,
+  rose: 0xee8695,
+  slateBlue: 0x4a7a96,
+  deepIndigo: 0x333f58,
+  night: 0x292831
+};
+
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1f2238);
-scene.fog = new THREE.Fog(0x36395a, 24, 106);
+scene.background = new THREE.Color(TWILIGHT5.night);
+scene.fog = new THREE.Fog(TWILIGHT5.deepIndigo, 24, 106);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
 camera.position.set(0, 4, 9);
@@ -29,8 +37,8 @@ controls.maxPolarAngle = Math.PI * 0.48;
 controls.minDistance = 3;
 controls.maxDistance = 18;
 
-scene.add(new THREE.HemisphereLight(0x8aa0d6, 0x2f3349, 0.9));
-const dirLight = new THREE.DirectionalLight(0xffb677, 1.12);
+scene.add(new THREE.HemisphereLight(TWILIGHT5.slateBlue, TWILIGHT5.night, 0.92));
+const dirLight = new THREE.DirectionalLight(TWILIGHT5.blush, 1.08);
 dirLight.position.set(8, 16, 6);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
@@ -48,8 +56,8 @@ function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments
 
   const positions = terrainGeometry.attributes.position;
   const colors = [];
-  const lowColor = new THREE.Color(0x33476b);
-  const highColor = new THREE.Color(0x8b7a98);
+  const lowColor = new THREE.Color(TWILIGHT5.deepIndigo);
+  const highColor = new THREE.Color(TWILIGHT5.slateBlue);
   const tint = new THREE.Color();
 
   for (let i = 0; i < positions.count; i += 1) {
@@ -87,7 +95,7 @@ function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments
   const contourOverlay = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size, 16, 16),
     new THREE.MeshBasicMaterial({
-      color: 0xb8a9d6,
+      color: TWILIGHT5.rose,
       wireframe: true,
       transparent: true,
       opacity: 0.07
@@ -259,6 +267,35 @@ async function loadGLTF(path) {
   });
 }
 
+function applyWarmRimAccent(material) {
+  if (!material || material.userData?.rimAccentApplied) return material;
+
+  const patched = material.clone();
+  patched.userData = { ...patched.userData, rimAccentApplied: true };
+
+  patched.onBeforeCompile = (shader) => {
+    shader.uniforms.rimColor = { value: new THREE.Color(TWILIGHT5.blush) };
+    shader.uniforms.rimStrength = { value: 0.16 };
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      `#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;`
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      `
+      float rim = pow(1.0 - saturate(dot(normalize(vNormal), normalize(vViewPosition))), 2.6);
+      gl_FragColor.rgb += rimColor * rim * rimStrength;
+      #include <dithering_fragment>
+      `
+    );
+  };
+
+  patched.needsUpdate = true;
+  return patched;
+}
+
 async function loadCharacterAndAnimations() {
   try {
     // Load character once.
@@ -415,8 +452,8 @@ async function loadLandmarkAssets() {
 }
 
 async function createLandmarks() {
-  const stoneMaterial = new THREE.MeshStandardMaterial({ color: 0x6c7491, roughness: 0.91, metalness: 0.03 });
-  const accentMaterial = new THREE.MeshStandardMaterial({ color: 0xb9adc8, roughness: 0.74, metalness: 0.08 });
+  const stoneMaterial = applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: TWILIGHT5.slateBlue, roughness: 0.91, metalness: 0.03 }));
+  const accentMaterial = applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: TWILIGHT5.rose, roughness: 0.74, metalness: 0.08 }));
   const materials = { stone: stoneMaterial, accent: accentMaterial };
   const landmarkAssets = await loadLandmarkAssets();
 
@@ -430,6 +467,11 @@ async function createLandmarks() {
         if (child.isMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map((material) => applyWarmRimAccent(material));
+          } else {
+            child.material = applyWarmRimAccent(child.material);
+          }
         }
       });
     } else if (landmark.type === 'tower') {
