@@ -88,11 +88,19 @@ scene.add(contourOverlay);
 const loader = new FBXLoader();
 const clock = new THREE.Clock();
 
+const DEFAULT_TIME_SCALE = 1;
+const SLOW_TIME_SCALE = 0.35;
+const urlParams = new URLSearchParams(window.location.search);
+let timeScale = urlParams.get('slow') === '1' ? SLOW_TIME_SCALE : DEFAULT_TIME_SCALE;
+let slowMode = timeScale !== DEFAULT_TIME_SCALE;
+
 const keys = {
   ArrowUp: false,
   ArrowLeft: false,
   ArrowRight: false,
-  Space: false
+  Space: false,
+  KeyE: false,
+  KeyT: false
 };
 
 let player;
@@ -103,7 +111,19 @@ let jumping = false;
 let velocityY = 0;
 const gravity = 26;
 const jumpVelocity = 9;
-const groundY = 0;
+let groundedY = 0;
+
+const interactable = {
+  mesh: null,
+  radius: 2.2,
+  activated: false,
+  promptEl: null,
+  statusEl: null
+};
+
+const modeHud = {
+  el: null
+};
 
 const animPaths = {
   idle: idleFbxUrl,
@@ -113,6 +133,12 @@ const animPaths = {
 
 // Use the idle FBX as the single loaded player rig/model source.
 const playerPath = animPaths.idle;
+
+function getTerrainHeightAt(x, z) {
+  const rolling = Math.sin(x * 0.07) * Math.cos(z * 0.05) * 0.12;
+  const patchNoise = Math.sin((x + z) * 0.18) * 0.04;
+  return rolling + patchNoise;
+}
 
 function setAction(nextName, fade = 0.2) {
   const next = actions[nextName];
@@ -216,6 +242,75 @@ async function loadCharacterAndAnimations() {
   }
 }
 
+function createInteractable() {
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.6, 0.25, 24),
+    new THREE.MeshStandardMaterial({ color: 0x4a5b75, roughness: 0.55, metalness: 0.35 })
+  );
+  base.position.set(4.5, 0.12, -2.8);
+  base.receiveShadow = true;
+
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.38, 24, 24),
+    new THREE.MeshStandardMaterial({
+      color: 0x66d8ff,
+      emissive: 0x1f8fff,
+      emissiveIntensity: 0.7,
+      roughness: 0.25,
+      metalness: 0.12
+    })
+  );
+  orb.position.y = 0.42;
+  orb.castShadow = true;
+  base.add(orb);
+
+  interactable.mesh = base;
+  scene.add(base);
+
+  interactable.promptEl = document.createElement('div');
+  interactable.promptEl.id = 'interaction-prompt';
+  interactable.promptEl.textContent = 'Press E to inspect glowing orb';
+  document.body.appendChild(interactable.promptEl);
+
+  interactable.statusEl = document.createElement('div');
+  interactable.statusEl.id = 'interaction-status';
+  document.body.appendChild(interactable.statusEl);
+
+  modeHud.el = document.createElement('div');
+  modeHud.el.id = 'mode-hud';
+  document.body.appendChild(modeHud.el);
+  updateModeHud();
+}
+
+function updateInteractionUI(canInteract) {
+  if (!interactable.promptEl) return;
+  interactable.promptEl.style.opacity = canInteract ? '1' : '0';
+  interactable.promptEl.style.transform = canInteract ? 'translate(-50%, 0)' : 'translate(-50%, 6px)';
+}
+
+function triggerInteraction() {
+  if (!interactable.mesh || !interactable.statusEl) return;
+
+  interactable.activated = !interactable.activated;
+  const orb = interactable.mesh.children[0];
+  if (orb?.material) {
+    orb.material.color.setHex(interactable.activated ? 0x7dffb5 : 0x66d8ff);
+    orb.material.emissive.setHex(interactable.activated ? 0x1ba653 : 0x1f8fff);
+  }
+
+  interactable.statusEl.textContent = interactable.activated
+    ? 'Orb attuned. Ancient mechanism hums to life.'
+    : 'Orb calms down.';
+  interactable.statusEl.classList.add('show');
+  setTimeout(() => interactable.statusEl?.classList.remove('show'), 1400);
+}
+
+function updateModeHud() {
+  if (!modeHud.el) return;
+  modeHud.el.textContent = slowMode ? 'SLOW MODE: ON (T)' : 'SLOW MODE: OFF (T)';
+  modeHud.el.classList.toggle('active', slowMode);
+}
+
 function onKey(isDown, e) {
   if (!(e.code in keys)) return;
   keys[e.code] = isDown;
@@ -225,6 +320,17 @@ function onKey(isDown, e) {
     jumping = true;
     velocityY = jumpVelocity;
     if (actions.jump) setAction('jump', 0.08);
+  }
+
+  if (isDown && e.code === 'KeyE' && player && interactable.mesh) {
+    const distance = player.position.distanceTo(interactable.mesh.position);
+    if (distance <= interactable.radius) triggerInteraction();
+  }
+
+  if (isDown && e.code === 'KeyT') {
+    slowMode = !slowMode;
+    timeScale = slowMode ? SLOW_TIME_SCALE : DEFAULT_TIME_SCALE;
+    updateModeHud();
   }
 }
 
@@ -253,29 +359,49 @@ function updatePlayer(delta) {
     setAction('idle', 0.2);
   }
 
+  const terrainY = getTerrainHeightAt(player.position.x, player.position.z);
+
   if (jumping) {
     velocityY -= gravity * delta;
     player.position.y += velocityY * delta;
 
-    if (player.position.y <= groundY) {
-      player.position.y = groundY;
+    if (player.position.y <= terrainY) {
+      player.position.y = terrainY;
       velocityY = 0;
       jumping = false;
+      groundedY = terrainY;
 
       if (moveVec.lengthSq() > 0 && actions.walk) setAction('walk', 0.14);
       else if (actions.idle) setAction('idle', 0.14);
     }
+  } else {
+    groundedY = terrainY;
+    player.position.y = groundedY;
   }
 
   // soft camera follow
   const desiredTarget = player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
   controls.target.lerp(desiredTarget, 1 - Math.pow(0.001, delta));
+
+  if (interactable.mesh) {
+    const distance = player.position.distanceTo(interactable.mesh.position);
+    const canInteract = distance <= interactable.radius;
+    updateInteractionUI(canInteract);
+
+    const orb = interactable.mesh.children[0];
+    if (orb) {
+      const t = clock.elapsedTime;
+      orb.position.y = 0.42 + Math.sin(t * 2.2) * 0.06;
+      orb.material.emissiveIntensity = interactable.activated ? 1.05 : 0.65 + (Math.sin(t * 4.4) + 1) * 0.12;
+    }
+  }
 }
 
 function render() {
   const delta = clock.getDelta();
-  if (mixer) mixer.update(delta);
-  updatePlayer(delta);
+  const scaledDelta = delta * timeScale;
+  if (mixer) mixer.update(scaledDelta);
+  updatePlayer(scaledDelta);
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(render);
@@ -288,5 +414,6 @@ window.addEventListener('resize', () => {
 });
 
 loadCharacterAndAnimations().finally(() => {
+  createInteractable();
   render();
 });
