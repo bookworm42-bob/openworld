@@ -173,7 +173,7 @@
       "status": "ready",
       "size": "small",
       "milestone": "v2",
-      "notes": "Source: https://poly.pizza (free low-poly models; catalog contains CC0 and CC-BY assets, so verify each chosen model's license before commit and record attribution text when CC-BY applies). Keep total added gzip payload under ~300KB."
+      "notes": "Primary candidates (Poly Pizza): Tower by Quaternius https://poly.pizza/m/iuMDwgTRMU (Public Domain CC0), Modular Ruins Pack by Quaternius https://poly.pizza/m/F2LAK03B0r (Public Domain CC0), Windmill by Poly by Google https://poly.pizza/m/ctIRaIM3zXu (Creative Commons Attribution 3.0; requires attribution). Prefer CC0 set first to avoid attribution overhead. Keep added gzip payload under ~300KB and document final model licenses in docs/assets-license-notes.md."
     },
     {
       "id": "T-023",
@@ -182,6 +182,30 @@
       "size": "small",
       "milestone": "v2",
       "notes": "Review against art goals in slow mode with screenshots at near/mid/far camera distances. Confirm player silhouette remains legible against terrain and fog, and landmarks are visible from spawn. Reference palette/asset constraints from Kenney CC0 nature kit https://kenney.nl/assets/nature-kit and ambientCG CC0 materials https://ambientcg.com."
+    },
+    {
+      "id": "T-024",
+      "title": "Programmer: stage one landmark composition pass (tower + ruins + windmill fallback) with silhouette-first placement",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Use CC0 candidates first: Tower https://poly.pizza/m/iuMDwgTRMU and Modular Ruins Pack https://poly.pizza/m/F2LAK03B0r. Place 3 landmarks at near/mid/far distances from spawn to guide navigation. Keep each landmark to <=2 material variants and reuse meshes to limit draw calls."
+    },
+    {
+      "id": "T-025",
+      "title": "Reviewer: validate asset-license ledger + art-style cohesion for newly imported landmarks",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Check docs/assets-license-notes.md includes source URL + exact license string per model (CC0 vs CC-BY). If any CC-BY model (e.g., Windmill https://poly.pizza/m/ctIRaIM3zXu) is used, verify attribution text is present in-project. Confirm landmarks read as stylized/low-poly and do not clash with character proportions."
+    },
+    {
+      "id": "T-026",
+      "title": "Playtest: run landmark discoverability route and capture readability screenshots (spawn, mid-path, landmark base)",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "In ?slow=1 mode, walk a fixed route toward each landmark and capture 3 screenshots per landmark distance bucket. Fail criteria: player silhouette blends into fog/terrain or landmark not visible from spawn within 5 seconds of camera scan."
     }
   ]
 }
