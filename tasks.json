@@ -327,6 +327,30 @@
       "size": "small",
       "milestone": "v2",
       "notes": "From fresh load in ?slow=1, run fixed 90-second route: spawn scan (10s), move toward nearest landmark (40s), pivot to second landmark (40s). Record 5 frames and score orientation clarity/readability. Keep license context intact for active assets: Kenney Nature Kit CC0 https://kenney.nl/assets/nature-kit and Poly Pizza Windmill CC BY https://poly.pizza/m/ctIRaIM3zXu (attribution required)."
+    },
+    {
+      "id": "T-042",
+      "title": "Programmer: add a silhouette beacon set (1 dead tree + 2 broken-stone accents) along the far-lane horizon",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Import up to 3 lightweight props and place as a single composition cluster to strengthen horizon readability: reuse an existing Kenney Nature Kit tree silhouette (CC0 https://kenney.nl/assets/nature-kit) plus Broken Fence Pillar CC0 https://poly.pizza/m/8RXyLygEeF (reuse existing where possible). Keep added compressed payload <= 80KB gzip and preserve primitive fallback if any model fails to load."
+    },
+    {
+      "id": "T-043",
+      "title": "Reviewer: audit silhouette beacon pass for style cohesion, license ledger, and perf budget",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Verify docs/assets-license-notes.md includes exact source URL + license string for each newly referenced model (target: CC0 on Poly Pizza entries). Confirm added beacons improve horizon guidance without competing against primary landmarks, and check build-size delta remains within the <= 80KB gzip target from T-042."
+    },
+    {
+      "id": "T-044",
+      "title": "Playtest: run dusk horizon-guidance sweep after silhouette beacon placement",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "In ?slow=1, capture 5 frames (spawn 0s, spawn 5s, mid-lane 30s, far-lane 60s, near-beacon 80s) and score 1-5 for horizon guidance clarity, player silhouette readability, and landmark priority. Pass if average >=4 and no new visual clutter causes navigation hesitation >3 seconds."
     }
   ]
 }
