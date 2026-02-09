@@ -255,6 +255,30 @@
       "size": "small",
       "milestone": "v2",
       "notes": "In ?slow=1 mode capture spawn/mid/far screenshots plus one landmark-approach frame. Score 1-5 for player silhouette contrast, landmark edge separation, and terrain noise distraction. Pass only if readability score average >=4 and no new aliasing shimmer appears while moving."
+    },
+    {
+      "id": "T-033",
+      "title": "Programmer: import 1-2 micro ruin accent props (CC0) and place near mid/far landmark paths for depth cues",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Source candidates researched this run: Poly Pizza Damaged Grave (CC0) https://poly.pizza/m/KWtVNrHXVR and Broken Fence Pillar (CC0) https://poly.pizza/m/8RXyLygEeF. Import as optimized GLB, reuse shared stone material when possible, and keep total gzip payload delta <= 60KB."
+    },
+    {
+      "id": "T-034",
+      "title": "Reviewer: audit new ruin accents for license compliance + composition noise",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Verify docs/assets-license-notes.md includes source URL + exact license strings for every newly imported ruin accent. Confirm added props improve depth cues without cluttering traversal lanes or competing with tower/windmill silhouettes from spawn."
+    },
+    {
+      "id": "T-035",
+      "title": "Playtest: run silhouette/readability pass with new ruin accents at dusk",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Use ?slow=1 and capture 4 screenshots (spawn, mid-path, near ruin accent, near landmark). Score 1-5 for player silhouette contrast and landmark discoverability; fail if accents create navigation confusion or reduce average readability below 4."
     }
   ]
 }
