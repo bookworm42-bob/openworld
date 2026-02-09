@@ -22,7 +22,7 @@
       "status": "done",
       "size": "small",
       "milestone": "v0",
-      "notes": "Added GitHub Actions workflow at .github/workflows/ci-build.yml to run npm ci + npm run build on push/PR."
+      "notes": "Added GitHub Actions workflow at .github/workflows/ci-build.yml to run npm ci + npm run build on push and pull_request."
     },
     {
       "id": "T-004",
@@ -30,7 +30,7 @@
       "status": "done",
       "size": "small",
       "milestone": "v1",
-      "notes": "Character loaded once from /public/3d_models/boy.fbx; Sad Idle/Walking/Jumping clips loaded separately and retargeted via SkeletonUtils.retargetClip."
+      "notes": "Integrated latest repo assets from 3d_models/boy. Player rig/model is loaded once from Sad Idle.fbx, with Walking.fbx and Jumping.fbx loaded separately and retargeted via SkeletonUtils.retargetClip."
     },
     {
       "id": "T-005",
@@ -42,24 +42,145 @@
     },
     {
       "id": "T-006",
-      "title": "Pull latest remote assets and verify /public/3d_models/boy FBX files are present",
-      "status": "ready",
+      "title": "Pull latest remote assets and verify /3d_models/boy FBX files are present",
+      "status": "done",
       "size": "small",
-      "milestone": "v1"
+      "milestone": "v1",
+      "notes": "Merged origin/main commit with FBX assets: Sad Idle.fbx, Walking.fbx, Jumping.fbx."
     },
     {
       "id": "T-007",
       "title": "Tune animation blend timings and movement mapping for forward/left/right/jump with actual FBX clips",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v1"
+      "milestone": "v1",
+      "notes": "Updated runtime to consume real FBX files via Vite asset URLs and validated build output with included animation assets."
     },
     {
       "id": "T-008",
-      "title": "Add quick playtest route note and screenshot capture checklist",
+      "title": "Fix character visibility and animation binding stability with real FBX assets",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Normalized character scale/grounding, reframed camera after load, and switched walk/jump to direct clip binding for this rig family."
+    },
+    {
+      "id": "T-009",
+      "title": "Capture deterministic animation verification screenshots (idle/forward/right/jump) via Playwright",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Generated validation screenshots in artifacts/ and delivered images one-by-one in Telegram."
+    },
+    {
+      "id": "T-010",
+      "title": "Commit and push latest scene + validation artifacts to main",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Committed runtime + CI + validation scripts/artifacts and pushed to origin/main."
+    },
+    {
+      "id": "T-011",
+      "title": "Add simple ground-plane terrain placeholder variations (color + subtle height illusion)",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Replaced flat floor with a subdivided terrain plane using subtle procedural undulation + per-vertex grass color variation, plus a faint wireframe contour overlay for readability."
+    },
+    {
+      "id": "T-012",
+      "title": "Implement basic gravity + floor collision lock for player movement",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Aligned player grounding/jump landing with procedural terrain height sampling so movement hugs terrain and gravity resolves to local floor instead of hardcoded y=0."
+    },
+    {
+      "id": "T-013",
+      "title": "Add one basic interactable object with proximity trigger and on-screen prompt",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Added a glowing orb pedestal interactable with proximity-gated \"Press E\" prompt and a status toast when toggled."
+    },
+    {
+      "id": "T-014",
+      "title": "Add automation instruction .md files for programmer/reviewer/playtest/status cron jobs",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Created automation/*.md and aligned cron payloads to reference these files."
+    },
+    {
+      "id": "T-015",
+      "title": "Implement slow mode for deterministic playtesting and screenshots",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Added ?slow=1 URL mode plus T key toggle with HUD indicator; movement/animation updates now scale by time factor."
+    },
+    {
+      "id": "T-016",
+      "title": "Establish first art-direction pass: mood/palette/prop style and 2-3 asset candidates",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Completed first art-direction pass: documented mood/palette/prop style and 3 CC0 asset candidates in docs/art-direction-pass-01.md; implemented dusk palette tuning + lightweight set-dressing prop clusters in scene for immediate visual coherence."
+    },
+    {
+      "id": "T-017",
+      "title": "Replace primitive set-dressing cluster with 1 imported CC0 nature-kit asset bundle (optimized glTF) and measure build size delta",
+      "status": "done",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Replaced primitive set-dressing with imported Kenney Nature Kit (CC0) GLB props (tree_oak, rock_smallE, log_stackLarge), loaded via GLTFLoader with shadow-ready cloning and primitive fallback. Asset payload kept minimal at +38,180 bytes raw (+12,435 bytes gzip) in public/assets/nature-kit. npm run build passes."
+    },
+    {
+      "id": "T-018",
+      "title": "Prototype 2-4 terrain chunks with distance-based visibility toggle",
+      "status": "done",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Split terrain into 4 procedural chunks (2x2 grid) and added runtime distance-based visibility culling per chunk for both floor + contour overlays using player/camera position."
+    },
+    {
+      "id": "T-019",
+      "title": "Add debug HUD showing active chunk count and player chunk index",
       "status": "ready",
       "size": "small",
-      "milestone": "v0"
+      "milestone": "v2"
+    },
+    {
+      "id": "T-020",
+      "title": "Playtest chunk prototype in slow mode and capture 3 validation screenshots",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2"
+    },
+    {
+      "id": "T-021",
+      "title": "Art pass: shift terrain + fog to a cohesive dusk palette and add subtle distance color grading",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Target look: stylized dusk-adventure with cool shadows + warm key light. Implement by tuning scene fog/sky/hemisphere colors and terrain vertex-color endpoints for stronger foreground-background separation."
+    },
+    {
+      "id": "T-022",
+      "title": "Asset integration: add 2-3 low-poly landmark props (windmill/ruin/tower) from Poly Pizza with explicit per-model license notes",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Source: https://poly.pizza (free low-poly models; catalog contains CC0 and CC-BY assets, so verify each chosen model's license before commit and record attribution text when CC-BY applies). Keep total added gzip payload under ~300KB."
+    },
+    {
+      "id": "T-023",
+      "title": "Reviewer + playtest visual readability check (silhouette, horizon contrast, landmark discoverability)",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Review against art goals in slow mode with screenshots at near/mid/far camera distances. Confirm player silhouette remains legible against terrain and fog, and landmarks are visible from spawn. Reference palette/asset constraints from Kenney CC0 nature kit https://kenney.nl/assets/nature-kit and ambientCG CC0 materials https://ambientcg.com."
     }
   ]
 }
