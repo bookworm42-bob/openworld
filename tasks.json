@@ -118,6 +118,14 @@
       "size": "small",
       "milestone": "v1",
       "notes": "Added ?slow=1 URL mode plus T key toggle with HUD indicator; movement/animation updates now scale by time factor."
+    },
+    {
+      "id": "T-016",
+      "title": "Establish first art-direction pass: mood/palette/prop style and 2-3 asset candidates",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v1",
+      "notes": "Driven by art-direction cron; include sources and license notes for any proposed assets."
     }
   ]
 }
