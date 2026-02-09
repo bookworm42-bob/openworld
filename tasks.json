@@ -279,6 +279,30 @@
       "size": "small",
       "milestone": "v2",
       "notes": "Use ?slow=1 and capture 4 screenshots (spawn, mid-path, near ruin accent, near landmark). Score 1-5 for player silhouette contrast and landmark discoverability; fail if accents create navigation confusion or reduce average readability below 4."
+    },
+    {
+      "id": "T-036",
+      "title": "Programmer: add foreground framing pass (2 tree clusters + 1 rock cluster) to improve depth at spawn",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Use existing Kenney Nature Kit CC0 assets already in project to place one near-left and one near-right tree cluster plus a low rock cluster in foreground. Keep traversal lane clear and reuse current materials/instances to avoid payload increase. Target: improve immediate scene composition without reducing silhouette readability."
+    },
+    {
+      "id": "T-037",
+      "title": "Reviewer: evaluate dusk value hierarchy after framing pass (player/landmark/foreground separation)",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Review screenshots at spawn and mid-path after T-036. Score 1-5 for value separation between (a) player, (b) primary landmark, (c) new foreground props. Fail if foreground props compete with landmark silhouettes or obscure navigation cues. Palette anchor remains Twilight-5 (#fbbbad #ee8695 #4a7a96 #333f58 #292831, https://lospec.com/palette-list/twilight-5)."
+    },
+    {
+      "id": "T-038",
+      "title": "Playtest: run 60-second first-impression route and verify landmark readability with added foreground dressing",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "In ?slow=1 mode, perform fixed 60-second route from spawn to nearest landmark and capture 4 frames (0s, 20s, 40s, 60s). Pass criteria: average readability >=4/5 and no new pop-in distraction. Keep license ledger reference intact for current sources: Kenney Nature Kit CC0 https://kenney.nl/assets/nature-kit and Poly Pizza CC0 accents (e.g., Damaged Grave https://poly.pizza/m/KWtVNrHXVR, Broken Fence Pillar https://poly.pizza/m/8RXyLygEeF)."
     }
   ]
 }
