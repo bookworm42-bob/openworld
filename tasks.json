@@ -155,9 +155,10 @@
     {
       "id": "T-020",
       "title": "Playtest chunk prototype in slow mode and capture 3 validation screenshots",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v2"
+      "milestone": "v2",
+      "notes": "Ran slow-mode chunk playtest via scripts/playtest-chunk-screens.cjs against vite preview after fresh build. Captured deterministic screenshots: artifacts/chunk-playtest-1-spawn.png, artifacts/chunk-playtest-2-midwalk.png, artifacts/chunk-playtest-3-near-edge.png."
     },
     {
       "id": "T-021",
