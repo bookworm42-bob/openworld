@@ -359,6 +359,30 @@
       "size": "small",
       "milestone": "v2",
       "notes": "Implemented scripts/check-bundle-budget.cjs and wired npm run build:budget (vite build + budget validation). Added README section with thresholds (JS 320KB, CSS 32KB, static assets 420KB gzip). Build validated in this run."
+    },
+    {
+      "id": "T-046",
+      "title": "Programmer: add atmospheric depth layer pass (2 subtle fog-color bands) to separate foreground traversal lane from far landmarks",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Implement a lightweight shader/scene pass that blends two distance bands over existing Twilight-5 grading (no postprocessing stack required). Goal: clearer depth hierarchy without adding noise. Keep GPU impact minimal (<0.3ms target on current baseline) and avoid changing player material. Visual references from stylized gradient-sky readability discussions and current dusk composition goals; test in ?slow=1."
+    },
+    {
+      "id": "T-047",
+      "title": "Reviewer: source + license/payload check for 1-2 modular ruin silhouette assets before import (Quaternius + Poly Pizza options)",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Compare candidate sources and document exact license strings + estimated gzip payload before any merge: (a) Quaternius Stylized Nature MegaKit (CC0, https://quaternius.com/packs/stylizednaturemegakit.html), (b) Poly Pizza CC0 model baseline example https://poly.pizza/m/KWtVNrHXVR, and CC-BY example https://poly.pizza/m/ctIRaIM3zXu (attribution required). Recommend only candidates that keep static gzip growth <=60KB and preserve low-poly cohesion."
+    },
+    {
+      "id": "T-048",
+      "title": "Playtest: run 3-distance readability scorecard after atmospheric depth pass",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "After T-046, run ?slow=1 and capture 4 frames (spawn 0s, spawn pan 5s, mid-lane 35s, far-lane 70s). Score 1-5 for (1) player silhouette contrast, (2) landmark priority clarity, (3) horizon guidance. Pass if average >=4.2 and no new banding artifacts are obvious during movement."
     }
   ]
 }
