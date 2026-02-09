@@ -303,6 +303,30 @@
       "size": "small",
       "milestone": "v2",
       "notes": "In ?slow=1 mode, perform fixed 60-second route from spawn to nearest landmark and capture 4 frames (0s, 20s, 40s, 60s). Pass criteria: average readability >=4/5 and no new pop-in distraction. Keep license ledger reference intact for current sources: Kenney Nature Kit CC0 https://kenney.nl/assets/nature-kit and Poly Pizza CC0 accents (e.g., Damaged Grave https://poly.pizza/m/KWtVNrHXVR, Broken Fence Pillar https://poly.pizza/m/8RXyLygEeF)."
+    },
+    {
+      "id": "T-039",
+      "title": "Programmer: lock spawn camera to horizon-first framing and add subtle sun-disc gradient cue",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Current spawn framing can open on mostly sky; set initial camera pitch/target clamp so terrain + one landmark are visible within first second. Add a lightweight sky sun-disc/radial gradient (shader or sprite, no HDRI) using Twilight-5 anchors (#fbbbad #ee8695 #4a7a96 #333f58 #292831, https://lospec.com/palette-list/twilight-5). Keep GPU cost negligible and preserve fog readability."
+    },
+    {
+      "id": "T-040",
+      "title": "Reviewer: verify first-5-seconds composition readability after spawn-framing pass",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "Capture 3 deterministic spawn screenshots (0s/2s/5s) in ?slow=1 and score 1-5 for: horizon balance, player silhouette contrast, and immediate landmark discoverability. Pass criteria: average >=4 and at least one landmark clearly legible at 0-2s without camera spin."
+    },
+    {
+      "id": "T-041",
+      "title": "Playtest: run 90-second landmark orientation test with first-impression scoring",
+      "status": "ready",
+      "size": "small",
+      "milestone": "v2",
+      "notes": "From fresh load in ?slow=1, run fixed 90-second route: spawn scan (10s), move toward nearest landmark (40s), pivot to second landmark (40s). Record 5 frames and score orientation clarity/readability. Keep license context intact for active assets: Kenney Nature Kit CC0 https://kenney.nl/assets/nature-kit and Poly Pizza Windmill CC BY https://poly.pizza/m/ctIRaIM3zXu (attribution required)."
     }
   ]
 }
