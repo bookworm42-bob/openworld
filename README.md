@@ -13,6 +13,8 @@ Open-world Three.js prototype with FBX character animation blending.
   - `ArrowUp` = move forward
   - `ArrowLeft` / `ArrowRight` = strafe
   - `Space` = jump
+  - `E` = interact
+  - `T` = toggle slow mode
 
 ## Run locally (recommended, normal setup)
 
@@ -86,6 +88,24 @@ node scripts/msg322-anim-shot.cjs
 Screenshots are written to `artifacts/`.
 
 ---
+
+## Automation instruction files
+
+Cron workers read these instruction files:
+
+- `automation/programmer.md`
+- `automation/reviewer.md`
+- `automation/playtest.md`
+- `automation/status-report.md`
+
+## Slow mode (for playtest)
+
+Two ways:
+
+- URL: `http://127.0.0.1:5173/?slow=1`
+- Runtime toggle: press `T`
+
+Slow mode lowers simulation speed so playtest can capture action-by-action screenshots.
 
 ## CI
 

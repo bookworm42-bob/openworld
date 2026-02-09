@@ -88,12 +88,19 @@ scene.add(contourOverlay);
 const loader = new FBXLoader();
 const clock = new THREE.Clock();
 
+const DEFAULT_TIME_SCALE = 1;
+const SLOW_TIME_SCALE = 0.35;
+const urlParams = new URLSearchParams(window.location.search);
+let timeScale = urlParams.get('slow') === '1' ? SLOW_TIME_SCALE : DEFAULT_TIME_SCALE;
+let slowMode = timeScale !== DEFAULT_TIME_SCALE;
+
 const keys = {
   ArrowUp: false,
   ArrowLeft: false,
   ArrowRight: false,
   Space: false,
-  KeyE: false
+  KeyE: false,
+  KeyT: false
 };
 
 let player;
@@ -112,6 +119,10 @@ const interactable = {
   activated: false,
   promptEl: null,
   statusEl: null
+};
+
+const modeHud = {
+  el: null
 };
 
 const animPaths = {
@@ -258,6 +269,11 @@ function createInteractable() {
   interactable.statusEl = document.createElement('div');
   interactable.statusEl.id = 'interaction-status';
   document.body.appendChild(interactable.statusEl);
+
+  modeHud.el = document.createElement('div');
+  modeHud.el.id = 'mode-hud';
+  document.body.appendChild(modeHud.el);
+  updateModeHud();
 }
 
 function updateInteractionUI(canInteract) {
@@ -283,6 +299,12 @@ function triggerInteraction() {
   setTimeout(() => interactable.statusEl?.classList.remove('show'), 1400);
 }
 
+function updateModeHud() {
+  if (!modeHud.el) return;
+  modeHud.el.textContent = slowMode ? 'SLOW MODE: ON (T)' : 'SLOW MODE: OFF (T)';
+  modeHud.el.classList.toggle('active', slowMode);
+}
+
 function onKey(isDown, e) {
   if (!(e.code in keys)) return;
   keys[e.code] = isDown;
@@ -297,6 +319,12 @@ function onKey(isDown, e) {
   if (isDown && e.code === 'KeyE' && player && interactable.mesh) {
     const distance = player.position.distanceTo(interactable.mesh.position);
     if (distance <= interactable.radius) triggerInteraction();
+  }
+
+  if (isDown && e.code === 'KeyT') {
+    slowMode = !slowMode;
+    timeScale = slowMode ? SLOW_TIME_SCALE : DEFAULT_TIME_SCALE;
+    updateModeHud();
   }
 }
 
@@ -359,8 +387,9 @@ function updatePlayer(delta) {
 
 function render() {
   const delta = clock.getDelta();
-  if (mixer) mixer.update(delta);
-  updatePlayer(delta);
+  const scaledDelta = delta * timeScale;
+  if (mixer) mixer.update(scaledDelta);
+  updatePlayer(scaledDelta);
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(render);
