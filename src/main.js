@@ -111,7 +111,7 @@ let jumping = false;
 let velocityY = 0;
 const gravity = 26;
 const jumpVelocity = 9;
-const groundY = 0;
+let groundedY = 0;
 
 const interactable = {
   mesh: null,
@@ -133,6 +133,12 @@ const animPaths = {
 
 // Use the idle FBX as the single loaded player rig/model source.
 const playerPath = animPaths.idle;
+
+function getTerrainHeightAt(x, z) {
+  const rolling = Math.sin(x * 0.07) * Math.cos(z * 0.05) * 0.12;
+  const patchNoise = Math.sin((x + z) * 0.18) * 0.04;
+  return rolling + patchNoise;
+}
 
 function setAction(nextName, fade = 0.2) {
   const next = actions[nextName];
@@ -353,18 +359,24 @@ function updatePlayer(delta) {
     setAction('idle', 0.2);
   }
 
+  const terrainY = getTerrainHeightAt(player.position.x, player.position.z);
+
   if (jumping) {
     velocityY -= gravity * delta;
     player.position.y += velocityY * delta;
 
-    if (player.position.y <= groundY) {
-      player.position.y = groundY;
+    if (player.position.y <= terrainY) {
+      player.position.y = terrainY;
       velocityY = 0;
       jumping = false;
+      groundedY = terrainY;
 
       if (moveVec.lengthSq() > 0 && actions.walk) setAction('walk', 0.14);
       else if (actions.idle) setAction('idle', 0.14);
     }
+  } else {
+    groundedY = terrainY;
+    player.position.y = groundedY;
   }
 
   // soft camera follow

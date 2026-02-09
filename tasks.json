@@ -91,9 +91,10 @@
     {
       "id": "T-012",
       "title": "Implement basic gravity + floor collision lock for player movement",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v1"
+      "milestone": "v1",
+      "notes": "Aligned player grounding/jump landing with procedural terrain height sampling so movement hugs terrain and gravity resolves to local floor instead of hardcoded y=0."
     },
     {
       "id": "T-013",
