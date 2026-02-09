@@ -22,3 +22,8 @@ Use **slow mode** for deterministic captures:
 ## Output
 - Keep 4-8 screenshots max per run.
 - Report pass/fail for movement, animation, interaction, and camera behavior.
+
+## Evolving test scope
+- As new features land, extend test coverage to include them (not just baseline movement/jump).
+- You may add temporary supplemental playtest cron jobs when deeper coverage is needed.
+- Remove/disable extra playtest cron jobs when no longer necessary to control noise/cost.
