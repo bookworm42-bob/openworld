@@ -150,6 +150,10 @@ const modeHud = {
   el: null
 };
 
+const chunkHud = {
+  el: null
+};
+
 const animPaths = {
   idle: idleFbxUrl,
   walk: walkFbxUrl,
@@ -399,6 +403,11 @@ function createInteractable() {
   modeHud.el.id = 'mode-hud';
   document.body.appendChild(modeHud.el);
   updateModeHud();
+
+  chunkHud.el = document.createElement('div');
+  chunkHud.el.id = 'chunk-hud';
+  document.body.appendChild(chunkHud.el);
+  updateChunkHud();
 }
 
 function updateInteractionUI(canInteract) {
@@ -428,6 +437,30 @@ function updateModeHud() {
   if (!modeHud.el) return;
   modeHud.el.textContent = slowMode ? 'SLOW MODE: ON (T)' : 'SLOW MODE: OFF (T)';
   modeHud.el.classList.toggle('active', slowMode);
+}
+
+function formatPlayerChunkIndex(position) {
+  const chunkIndex = terrainChunks.findIndex((chunk) => {
+    const withinX = Math.abs(position.x - chunk.center.x) <= halfChunk;
+    const withinZ = Math.abs(position.z - chunk.center.y) <= halfChunk;
+    return withinX && withinZ;
+  });
+
+  if (chunkIndex === -1) return 'out-of-grid';
+
+  const chunk = terrainChunks[chunkIndex];
+  const gridX = chunk.center.x < 0 ? 0 : 1;
+  const gridZ = chunk.center.y < 0 ? 0 : 1;
+  return `${chunkIndex} (x:${gridX}, z:${gridZ})`;
+}
+
+function updateChunkHud() {
+  if (!chunkHud.el) return;
+
+  const activeChunks = terrainChunks.reduce((count, chunk) => count + (chunk.floor.visible ? 1 : 0), 0);
+  const referencePosition = player ? player.position : camera.position;
+  const playerChunk = formatPlayerChunkIndex(referencePosition);
+  chunkHud.el.textContent = `Chunks: ${activeChunks}/${terrainChunks.length} · Player chunk: ${playerChunk}`;
 }
 
 function onKey(isDown, e) {
@@ -522,6 +555,7 @@ function render() {
   if (mixer) mixer.update(scaledDelta);
   updatePlayer(scaledDelta);
   updateTerrainChunkVisibility();
+  updateChunkHud();
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(render);

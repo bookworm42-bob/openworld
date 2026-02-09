@@ -147,9 +147,10 @@
     {
       "id": "T-019",
       "title": "Add debug HUD showing active chunk count and player chunk index",
-      "status": "ready",
+      "status": "done",
       "size": "small",
-      "milestone": "v2"
+      "milestone": "v2",
+      "notes": "Added top-left chunk HUD that updates every frame with visible chunk count and player chunk index in the 2x2 terrain grid (or out-of-grid when outside bounds)."
     },
     {
       "id": "T-020",
