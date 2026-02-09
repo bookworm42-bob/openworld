@@ -1,6 +1,7 @@
 import './style.css';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import idleFbxUrl from '../3d_models/boy/Sad Idle.fbx?url';
 import walkFbxUrl from '../3d_models/boy/Walking.fbx?url';
@@ -86,6 +87,7 @@ contourOverlay.position.y = 0.025;
 scene.add(contourOverlay);
 
 const loader = new FBXLoader();
+const gltfLoader = new GLTFLoader();
 const clock = new THREE.Clock();
 
 const DEFAULT_TIME_SCALE = 1;
@@ -129,6 +131,12 @@ const animPaths = {
   idle: idleFbxUrl,
   walk: walkFbxUrl,
   jump: jumpFbxUrl
+};
+
+const natureKitPaths = {
+  tree: '/assets/nature-kit/tree_oak.glb',
+  rock: '/assets/nature-kit/rock_smallE.glb',
+  logStack: '/assets/nature-kit/log_stackLarge.glb'
 };
 
 // Use the idle FBX as the single loaded player rig/model source.
@@ -177,6 +185,12 @@ function inferAnimationClip(object3d) {
 async function loadFBX(path) {
   return await new Promise((resolve, reject) => {
     loader.load(path, resolve, undefined, reject);
+  });
+}
+
+async function loadGLTF(path) {
+  return await new Promise((resolve, reject) => {
+    gltfLoader.load(path, resolve, undefined, reject);
   });
 }
 
@@ -242,41 +256,75 @@ async function loadCharacterAndAnimations() {
   }
 }
 
-function createSetDressing() {
-  const rockMaterial = new THREE.MeshStandardMaterial({
-    color: 0x6c6f7f,
-    roughness: 0.9,
-    metalness: 0.03
-  });
-  const ruinMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8b7b67,
-    roughness: 0.85,
-    metalness: 0.02
-  });
-
+async function createSetDressing() {
   const propAnchors = [
     { x: -6.5, z: -4.2, scale: 1.2 },
     { x: 7.4, z: 4.6, scale: 0.9 },
     { x: -9.2, z: 6.8, scale: 1.05 }
   ];
 
-  propAnchors.forEach((anchor, index) => {
-    const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 1.1, 6), ruinMaterial);
-    stump.position.set(anchor.x, getTerrainHeightAt(anchor.x, anchor.z) + 0.55, anchor.z);
-    stump.scale.setScalar(anchor.scale);
-    stump.rotation.y = index * 0.7;
-    stump.castShadow = true;
-    stump.receiveShadow = true;
-    scene.add(stump);
+  try {
+    const [treeGltf, rockGltf, logStackGltf] = await Promise.all([
+      loadGLTF(natureKitPaths.tree),
+      loadGLTF(natureKitPaths.rock),
+      loadGLTF(natureKitPaths.logStack)
+    ]);
 
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45, 0), rockMaterial);
-    rock.position.set(anchor.x + 0.85, getTerrainHeightAt(anchor.x + 0.85, anchor.z + 0.35) + 0.3, anchor.z + 0.35);
-    rock.rotation.set(0.2 * index, 0.45, -0.15 * index);
-    rock.scale.set(anchor.scale * 0.9, anchor.scale * 0.75, anchor.scale * 0.95);
-    rock.castShadow = true;
-    rock.receiveShadow = true;
-    scene.add(rock);
-  });
+    propAnchors.forEach((anchor, index) => {
+      const tree = treeGltf.scene.clone(true);
+      tree.position.set(anchor.x, getTerrainHeightAt(anchor.x, anchor.z), anchor.z);
+      tree.scale.setScalar(anchor.scale * 1.45);
+      tree.rotation.y = 0.6 + index * 0.9;
+      tree.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      scene.add(tree);
+
+      const rock = rockGltf.scene.clone(true);
+      const rockX = anchor.x + 1.1;
+      const rockZ = anchor.z + 0.4;
+      rock.position.set(rockX, getTerrainHeightAt(rockX, rockZ), rockZ);
+      rock.scale.setScalar(anchor.scale * 0.9);
+      rock.rotation.y = index * 0.8;
+      rock.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      scene.add(rock);
+
+      const logs = logStackGltf.scene.clone(true);
+      const logX = anchor.x - 0.95;
+      const logZ = anchor.z + 0.2;
+      logs.position.set(logX, getTerrainHeightAt(logX, logZ), logZ);
+      logs.scale.setScalar(anchor.scale * 0.95);
+      logs.rotation.y = -0.3 + index * 0.45;
+      logs.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      scene.add(logs);
+    });
+  } catch (error) {
+    console.warn('Nature Kit props failed to load, using primitive fallback:', error);
+
+    const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x8b7b67, roughness: 0.85, metalness: 0.02 });
+    propAnchors.forEach((anchor, index) => {
+      const fallback = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 1.1, 6), fallbackMaterial);
+      fallback.position.set(anchor.x, getTerrainHeightAt(anchor.x, anchor.z) + 0.55, anchor.z);
+      fallback.scale.setScalar(anchor.scale);
+      fallback.rotation.y = index * 0.7;
+      fallback.castShadow = true;
+      fallback.receiveShadow = true;
+      scene.add(fallback);
+    });
+  }
 }
 
 function createInteractable() {
@@ -450,8 +498,8 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-loadCharacterAndAnimations().finally(() => {
-  createSetDressing();
+loadCharacterAndAnimations().finally(async () => {
+  await createSetDressing();
   createInteractable();
   render();
 });

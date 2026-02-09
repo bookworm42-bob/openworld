@@ -131,10 +131,10 @@
     {
       "id": "T-017",
       "title": "Replace primitive set-dressing cluster with 1 imported CC0 nature-kit asset bundle (optimized glTF) and measure build size delta",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v1",
-      "notes": "Start with Kenney Nature Kit (https://kenney.nl/assets/nature-kit, CC0). Keep asset payload minimal and record compressed size impact in notes."
+      "notes": "Replaced primitive set-dressing with imported Kenney Nature Kit (CC0) GLB props (tree_oak, rock_smallE, log_stackLarge), loaded via GLTFLoader with shadow-ready cloning and primitive fallback. Asset payload kept minimal at +38,180 bytes raw (+12,435 bytes gzip) in public/assets/nature-kit. npm run build passes."
     }
   ]
 }
