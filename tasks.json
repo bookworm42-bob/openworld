@@ -219,10 +219,10 @@
     {
       "id": "T-028",
       "title": "Reviewer: verify candidate ruins asset pack feasibility (license + payload budget) before import",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Audit Modular Ruins Pack candidate https://poly.pizza/m/F2LAK03B0r (listed as Public Domain CC0) against existing landmark assets and gzip budget. Confirm source URL, exact license text, and estimated compressed payload delta before merge; if over budget, require selective extraction (1-2 pieces only) and document decision in docs/assets-license-notes.md."
+      "notes": "Audited Modular Ruins Pack source/license and measured payload feasibility. Candidate GLB URL resolved from page metadata to static.poly.pizza/fa6cf69d-a091-4eb7-b62e-56290d8b9097.glb (CC0). Size check: 7,965,364 bytes raw and ~2,701,915 bytes gzip versus current landmark baseline ~299,400 bytes gzip. Marked as over budget and documented decision to avoid full-pack import; future work must selectively extract 1-2 pieces and re-measure before merge in docs/assets-license-notes.md."
     },
     {
       "id": "T-029",

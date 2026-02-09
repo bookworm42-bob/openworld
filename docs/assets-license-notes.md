@@ -20,5 +20,11 @@
 
 ### Modular Ruins Pack — Quaternius
 - Source page: https://poly.pizza/m/F2LAK03B0r
-- License: Public Domain (CC0 1.0)
-- Note: Not imported in this pass because the GLB payload is significantly larger than the current milestone budget.
+- Direct model URL (from page metadata): https://static.poly.pizza/fa6cf69d-a091-4eb7-b62e-56290d8b9097.glb
+- License: **Public Domain (CC0 1.0)**
+- License URL: https://creativecommons.org/publicdomain/zero/1.0/
+- Payload audit (2026-02-09):
+  - Candidate GLB size: **7,965,364 bytes raw** (~7.6 MiB)
+  - Candidate GLB gzip estimate: **2,701,915 bytes** (~2.58 MiB)
+  - Current imported landmark payload baseline (tower + windmill): **299,400 bytes gzip**
+- Decision: Over budget for current milestone target (~300 KB gzip). Do **not** import full pack; if needed, follow-up must selectively extract only 1-2 ruin pieces into a much smaller derived GLB and re-measure before merge.
