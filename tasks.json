@@ -259,10 +259,10 @@
     {
       "id": "T-033",
       "title": "Programmer: import 1-2 micro ruin accent props (CC0) and place near mid/far landmark paths for depth cues",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Source candidates researched this run: Poly Pizza Damaged Grave (CC0) https://poly.pizza/m/KWtVNrHXVR and Broken Fence Pillar (CC0) https://poly.pizza/m/8RXyLygEeF. Import as optimized GLB, reuse shared stone material when possible, and keep total gzip payload delta <= 60KB."
+      "notes": "Imported both researched CC0 Poly Pizza accents into public/assets/poly-pizza (Damaged Grave https://poly.pizza/m/KWtVNrHXVR, Broken Fence Pillar https://poly.pizza/m/8RXyLygEeF) and placed 4 instances along mid/far landmark approach lanes in createSetDressing. Added primitive fallback placement path. Measured gzip payload delta at +36,225 bytes (<= 60KB target)."
     },
     {
       "id": "T-034",
@@ -283,10 +283,10 @@
     {
       "id": "T-036",
       "title": "Programmer: add foreground framing pass (2 tree clusters + 1 rock cluster) to improve depth at spawn",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Use existing Kenney Nature Kit CC0 assets already in project to place one near-left and one near-right tree cluster plus a low rock cluster in foreground. Keep traversal lane clear and reuse current materials/instances to avoid payload increase. Target: improve immediate scene composition without reducing silhouette readability."
+      "notes": "Added a foreground framing pass in createSetDressing using existing Kenney Nature Kit assets already loaded in-scene: two near-spawn tree clusters (left/right) plus one low rock cluster, with supplemental small rocks at each tree anchor. Placement keeps the central forward lane open for traversal while improving spawn depth cues. No new external assets added; build passes."
     },
     {
       "id": "T-037",

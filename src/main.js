@@ -288,6 +288,11 @@ const landmarkAssetPaths = {
   windmill: '/assets/poly-pizza/windmill-poly-google.glb'
 };
 
+const ruinAccentAssetPaths = {
+  damagedGrave: '/assets/poly-pizza/damaged-grave-kay-lousberg.glb',
+  brokenFencePillar: '/assets/poly-pizza/broken-fence-pillar-kay-lousberg.glb'
+};
+
 const landmarkLayout = [
   {
     id: 'tower-near',
@@ -609,66 +614,113 @@ async function createSetDressing() {
     { x: -9.2, z: 6.8, scale: 1.05 }
   ];
 
+  const foregroundTreeClusters = [
+    { x: -11.5, z: -9.4, scale: 1.32, rotation: 0.35 },
+    { x: 10.9, z: -8.7, scale: 1.22, rotation: -0.6 }
+  ];
+
+  const foregroundRockCluster = { x: -2.4, z: -11.4, scale: 1.15, rotation: 0.22 };
+  const ruinAccentAnchors = [
+    { x: -24, z: 11, scale: 1.05, rotation: 0.4, type: 'damagedGrave' },
+    { x: -35, z: 19, scale: 1.2, rotation: -0.2, type: 'brokenFencePillar' },
+    { x: 33, z: 24, scale: 0.95, rotation: 0.1, type: 'damagedGrave' },
+    { x: 58, z: 46, scale: 1.15, rotation: -0.55, type: 'brokenFencePillar' }
+  ];
+
   try {
-    const [treeGltf, rockGltf, logStackGltf] = await Promise.all([
+    const [treeGltf, rockGltf, logStackGltf, damagedGraveGltf, brokenFencePillarGltf] = await Promise.all([
       loadGLTF(natureKitPaths.tree),
       loadGLTF(natureKitPaths.rock),
-      loadGLTF(natureKitPaths.logStack)
+      loadGLTF(natureKitPaths.logStack),
+      loadGLTF(ruinAccentAssetPaths.damagedGrave),
+      loadGLTF(ruinAccentAssetPaths.brokenFencePillar)
     ]);
 
+    const placeNatureProp = (source, { x, z, scale, rotation = 0 }) => {
+      const mesh = source.scene.clone(true);
+      mesh.position.set(x, getTerrainHeightAt(x, z), z);
+      mesh.scale.setScalar(scale);
+      mesh.rotation.y = rotation;
+      mesh.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      scene.add(mesh);
+    };
+
     propAnchors.forEach((anchor, index) => {
-      const tree = treeGltf.scene.clone(true);
-      tree.position.set(anchor.x, getTerrainHeightAt(anchor.x, anchor.z), anchor.z);
-      tree.scale.setScalar(anchor.scale * 1.45);
-      tree.rotation.y = 0.6 + index * 0.9;
-      tree.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
+      placeNatureProp(treeGltf, {
+        x: anchor.x,
+        z: anchor.z,
+        scale: anchor.scale * 1.45,
+        rotation: 0.6 + index * 0.9
       });
-      scene.add(tree);
 
-      const rock = rockGltf.scene.clone(true);
-      const rockX = anchor.x + 1.1;
-      const rockZ = anchor.z + 0.4;
-      rock.position.set(rockX, getTerrainHeightAt(rockX, rockZ), rockZ);
-      rock.scale.setScalar(anchor.scale * 0.9);
-      rock.rotation.y = index * 0.8;
-      rock.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
+      placeNatureProp(rockGltf, {
+        x: anchor.x + 1.1,
+        z: anchor.z + 0.4,
+        scale: anchor.scale * 0.9,
+        rotation: index * 0.8
       });
-      scene.add(rock);
 
-      const logs = logStackGltf.scene.clone(true);
-      const logX = anchor.x - 0.95;
-      const logZ = anchor.z + 0.2;
-      logs.position.set(logX, getTerrainHeightAt(logX, logZ), logZ);
-      logs.scale.setScalar(anchor.scale * 0.95);
-      logs.rotation.y = -0.3 + index * 0.45;
-      logs.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
+      placeNatureProp(logStackGltf, {
+        x: anchor.x - 0.95,
+        z: anchor.z + 0.2,
+        scale: anchor.scale * 0.95,
+        rotation: -0.3 + index * 0.45
       });
-      scene.add(logs);
+    });
+
+    // Foreground framing pass near spawn: two tree clusters + one low rock cluster.
+    foregroundTreeClusters.forEach((cluster) => {
+      placeNatureProp(treeGltf, cluster);
+      placeNatureProp(rockGltf, {
+        x: cluster.x + Math.sign(cluster.x) * -1.15,
+        z: cluster.z + 0.8,
+        scale: cluster.scale * 0.62,
+        rotation: cluster.rotation * -0.8
+      });
+    });
+
+    placeNatureProp(rockGltf, foregroundRockCluster);
+
+    const ruinAccentSources = {
+      damagedGrave: damagedGraveGltf,
+      brokenFencePillar: brokenFencePillarGltf
+    };
+
+    ruinAccentAnchors.forEach((anchor) => {
+      const source = ruinAccentSources[anchor.type];
+      if (!source) return;
+      placeNatureProp(source, anchor);
     });
   } catch (error) {
-    console.warn('Nature Kit props failed to load, using primitive fallback:', error);
+    console.warn('Nature Kit/ruin props failed to load, using primitive fallback:', error);
 
     const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x8b7b67, roughness: 0.85, metalness: 0.02 });
-    propAnchors.forEach((anchor, index) => {
+    const placeFallback = ({ x, z, scale, rotation = 0 }) => {
       const fallback = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 1.1, 6), fallbackMaterial);
-      fallback.position.set(anchor.x, getTerrainHeightAt(anchor.x, anchor.z) + 0.55, anchor.z);
-      fallback.scale.setScalar(anchor.scale);
-      fallback.rotation.y = index * 0.7;
+      fallback.position.set(x, getTerrainHeightAt(x, z) + 0.55, z);
+      fallback.scale.setScalar(scale);
+      fallback.rotation.y = rotation;
       fallback.castShadow = true;
       fallback.receiveShadow = true;
       scene.add(fallback);
+    };
+
+    propAnchors.forEach((anchor, index) => {
+      placeFallback({ x: anchor.x, z: anchor.z, scale: anchor.scale, rotation: index * 0.7 });
+    });
+
+    foregroundTreeClusters.forEach((cluster) => {
+      placeFallback(cluster);
+    });
+    placeFallback(foregroundRockCluster);
+
+    ruinAccentAnchors.forEach((anchor) => {
+      placeFallback({ ...anchor, scale: anchor.scale * 0.7 });
     });
   }
 }

@@ -16,6 +16,25 @@
 - Required attribution text:
   - "Windmill" by Poly by Google via Poly Pizza (https://poly.pizza/m/ctIRaIM3zXu), licensed under CC BY 3.0.
 
+### Damaged Grave — Kay Lousberg
+- Source page: https://poly.pizza/m/KWtVNrHXVR
+- Downloaded file: `public/assets/poly-pizza/damaged-grave-kay-lousberg.glb`
+- License: **Public Domain (CC0 1.0)**
+- License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+### Broken Fence Pillar — Kay Lousberg
+- Source page: https://poly.pizza/m/8RXyLygEeF
+- Downloaded file: `public/assets/poly-pizza/broken-fence-pillar-kay-lousberg.glb`
+- License: **Public Domain (CC0 1.0)**
+- License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+### Payload impact (T-033 micro accents)
+- Added files raw sizes:
+  - `damaged-grave-kay-lousberg.glb`: **40,800 bytes**
+  - `broken-fence-pillar-kay-lousberg.glb`: **23,748 bytes**
+- Added gzip estimate (level 9): **36,225 bytes total delta**
+- Result: within T-033 budget constraint (<= 60 KB gzip delta).
+
 ## Deferred candidate (not imported)
 
 ### Modular Ruins Pack — Quaternius
