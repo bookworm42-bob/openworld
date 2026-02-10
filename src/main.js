@@ -248,6 +248,14 @@ function markBootStage(stage, details = '') {
   console.log(`[boot-debug] stage=${stage} at ${elapsed}ms${details ? ` | ${details}` : ''}`);
 }
 
+function formatVec3Debug(vec3) {
+  if (!vec3) return 'n/a';
+  const x = Number.isFinite(vec3.x) ? vec3.x.toFixed(3) : String(vec3.x);
+  const y = Number.isFinite(vec3.y) ? vec3.y.toFixed(3) : String(vec3.y);
+  const z = Number.isFinite(vec3.z) ? vec3.z.toFixed(3) : String(vec3.z);
+  return `(${x}, ${y}, ${z})`;
+}
+
 function createBootLoadingOverlay() {
   const overlay = document.createElement('div');
   overlay.id = 'boot-loading-overlay';
@@ -397,6 +405,19 @@ function getTerrainHeightAt(x, z) {
 
 function updateTerrainChunkVisibility() {
   const referencePosition = player ? player.position : camera.position;
+
+  if (!Number.isFinite(referencePosition.x) || !Number.isFinite(referencePosition.z)) {
+    console.warn('[boot-debug] updateTerrainChunkVisibility: non-finite reference position, forcing chunks visible', {
+      x: referencePosition.x,
+      z: referencePosition.z
+    });
+    terrainChunks.forEach((chunk) => {
+      chunk.floor.visible = true;
+      chunk.contourOverlay.visible = true;
+    });
+    return;
+  }
+
   terrainChunks.forEach((chunk) => {
     const dx = referencePosition.x - chunk.center.x;
     const dz = referencePosition.z - chunk.center.y;
@@ -417,6 +438,8 @@ function setAction(nextName, fade = 0.2) {
 }
 
 function normalizePlayerScaleAndGround(object3d, targetHeight = 1.8) {
+  object3d.updateMatrixWorld(true);
+
   const box = new THREE.Box3().setFromObject(object3d);
   if (box.isEmpty()) {
     console.warn('[boot-debug] normalizePlayerScaleAndGround: empty bounds, skipping normalization');
@@ -432,7 +455,21 @@ function normalizePlayerScaleAndGround(object3d, targetHeight = 1.8) {
   }
 
   const scale = targetHeight / size.y;
+  if (!Number.isFinite(scale) || scale < 0.005 || scale > 50) {
+    console.warn('[boot-debug] normalizePlayerScaleAndGround: suspicious scale, skipping normalization', {
+      sizeY: size.y,
+      scale
+    });
+    return false;
+  }
+
+  console.log('[boot-debug] normalizePlayerScaleAndGround: applying', {
+    sizeY: Number(size.y.toFixed(4)),
+    scale: Number(scale.toFixed(4))
+  });
+
   object3d.scale.multiplyScalar(scale);
+  object3d.updateMatrixWorld(true);
 
   // Recompute and set feet on y=0.
   box.setFromObject(object3d);
@@ -442,6 +479,17 @@ function normalizePlayerScaleAndGround(object3d, targetHeight = 1.8) {
   }
 
   object3d.position.y -= box.min.y;
+  object3d.updateMatrixWorld(true);
+
+  const stabilizedBox = new THREE.Box3().setFromObject(object3d);
+  const stabilizedSize = new THREE.Vector3();
+  stabilizedBox.getSize(stabilizedSize);
+  console.log('[boot-debug] normalizePlayerScaleAndGround: result', {
+    minY: Number(stabilizedBox.min.y.toFixed(4)),
+    maxY: Number(stabilizedBox.max.y.toFixed(4)),
+    sizeY: Number(stabilizedSize.y.toFixed(4))
+  });
+
   return true;
 }
 
@@ -539,34 +587,42 @@ async function loadCharacterAndAnimations() {
       throw new Error('Player bounds invalid after FBX load; aborting rig setup for safe fallback.');
     }
 
+    console.log(`[boot-debug] player normalized | pos=${formatVec3Debug(player.position)} scale=${formatVec3Debug(player.scale)}`);
+
     mixer = new THREE.AnimationMixer(player);
 
-    // Load only extra animation sources; player model is already loaded once from idle FBX.
-    const [walkFbx, jumpFbx] = await Promise.all([
-      loadFBX(animPaths.walk),
-      loadFBX(animPaths.jump)
-    ]);
-    console.log('[boot-debug] walk/jump FBX loaded');
-
     const idleClip = inferAnimationClip(player);
-    const walkClip = inferAnimationClip(walkFbx);
-    const jumpClip = inferAnimationClip(jumpFbx);
-
-    if (!idleClip || !walkClip || !jumpClip) {
-      throw new Error('One or more animation clips missing from FBX files.');
+    if (!idleClip) {
+      throw new Error('Idle animation clip missing from player FBX.');
     }
 
-    // These clips come from the same rig family; direct binding is more stable than retargeting here.
     actions.idle = mixer.clipAction(idleClip);
-    actions.walk = mixer.clipAction(walkClip);
-    actions.jump = mixer.clipAction(jumpClip);
-
-    actions.walk.setLoop(THREE.LoopRepeat);
     actions.idle.setLoop(THREE.LoopRepeat);
-    actions.jump.setLoop(THREE.LoopOnce, 1);
-    actions.jump.clampWhenFinished = true;
-
     setAction('idle', 0.01);
+
+    // Do not block first render on optional movement clips.
+    Promise.all([loadFBX(animPaths.walk), loadFBX(animPaths.jump)])
+      .then(([walkFbx, jumpFbx]) => {
+        const walkClip = inferAnimationClip(walkFbx);
+        const jumpClip = inferAnimationClip(jumpFbx);
+
+        if (!walkClip || !jumpClip) {
+          console.warn('[boot-debug] walk/jump clips missing; movement animation disabled');
+          return;
+        }
+
+        // These clips come from the same rig family; direct binding is more stable than retargeting here.
+        actions.walk = mixer.clipAction(walkClip);
+        actions.jump = mixer.clipAction(jumpClip);
+        actions.walk.setLoop(THREE.LoopRepeat);
+        actions.jump.setLoop(THREE.LoopOnce, 1);
+        actions.jump.clampWhenFinished = true;
+
+        console.log('[boot-debug] walk/jump animations ready (deferred)');
+      })
+      .catch((error) => {
+        console.warn('[boot-debug] walk/jump deferred load failed; continuing with idle-only animation', error);
+      });
 
     // Reframe camera once character bounds are known.
     const box = new THREE.Box3().setFromObject(player);
@@ -1058,7 +1114,10 @@ function render() {
   renderer.render(scene, camera);
 
   if (!bootStages.firstFrameRendered) {
-    markBootStage('firstFrameRendered', `children=${scene.children.length}`);
+    markBootStage(
+      'firstFrameRendered',
+      `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
+    );
     hideBootLoadingOverlay('first-frame');
   }
 
@@ -1083,7 +1142,7 @@ window.addEventListener('resize', () => {
 
     console.log('[boot-debug] character ready, starting render loop');
     render();
-    markBootStage('renderStarted');
+    markBootStage('renderStarted', `camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`);
 
     setBootLoadingStatus('Loading world dressing…');
     const stageTasks = [createSetDressing(), createLandmarks()];
