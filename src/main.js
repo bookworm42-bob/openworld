@@ -296,9 +296,15 @@ function hideBootLoadingOverlay(mode = 'complete') {
   console.log(`[boot] loading overlay removed (${mode}) after ${elapsed}ms`);
 }
 
-function maybeHideBootOverlayAfterCharacterFrame() {
-  if (!bootStages.characterReady || !bootStages.firstFrameWithCharacterRendered) return;
-  hideBootLoadingOverlay('character-first-frame');
+function maybeHideBootOverlayAfterFirstRenderableFrame() {
+  const worldReady = bootStages.setDressingReady && bootStages.landmarksReady;
+  const canHideAfterWorldFrame = worldReady && bootStages.firstFrameRendered;
+  const canHideAfterCharacterFrame = bootStages.characterReady && bootStages.firstFrameWithCharacterRendered;
+
+  if (!canHideAfterWorldFrame && !canHideAfterCharacterFrame) return;
+
+  const mode = canHideAfterCharacterFrame ? 'character-first-frame' : 'world-first-frame';
+  hideBootLoadingOverlay(mode);
 }
 
 createBootLoadingOverlay();
@@ -323,6 +329,11 @@ assetLoadingManager.onError = (url) => {
 const loader = new FBXLoader(assetLoadingManager);
 const gltfLoader = new GLTFLoader(assetLoadingManager);
 const clock = new THREE.Clock();
+
+const loadDebugState = {
+  fbxInFlight: 0,
+  gltfInFlight: 0
+};
 
 const DEFAULT_TIME_SCALE = 1;
 const SLOW_TIME_SCALE = 0.35;
@@ -518,7 +529,8 @@ function inferAnimationClip(object3d) {
 
 async function loadFBX(path) {
   const startedAt = performance.now();
-  console.log(`[boot-debug] FBX load start: ${path}`);
+  loadDebugState.fbxInFlight += 1;
+  console.log(`[boot-debug] FBX load start: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
   try {
     let lastProgressBucket = -1;
@@ -545,12 +557,16 @@ async function loadFBX(path) {
     const elapsed = Math.round(performance.now() - startedAt);
     console.error(`[boot-debug] FBX load failed: ${path} (${elapsed}ms)`, error);
     throw error;
+  } finally {
+    loadDebugState.fbxInFlight = Math.max(0, loadDebugState.fbxInFlight - 1);
+    console.log(`[boot-debug] FBX load settled: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
   }
 }
 
 async function loadGLTF(path) {
   const startedAt = performance.now();
-  console.log(`[boot-debug] GLTF load start: ${path}`);
+  loadDebugState.gltfInFlight += 1;
+  console.log(`[boot-debug] GLTF load start: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
   try {
     const result = await new Promise((resolve, reject) => {
@@ -563,6 +579,9 @@ async function loadGLTF(path) {
     const elapsed = Math.round(performance.now() - startedAt);
     console.error(`[boot-debug] GLTF load failed: ${path} (${elapsed}ms)`, error);
     throw error;
+  } finally {
+    loadDebugState.gltfInFlight = Math.max(0, loadDebugState.gltfInFlight - 1);
+    console.log(`[boot-debug] GLTF load settled: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
   }
 }
 
@@ -628,29 +647,7 @@ async function loadCharacterAndAnimations() {
     actions.idle.setLoop(THREE.LoopRepeat);
     setAction('idle', 0.01);
 
-    // Do not block first render on optional movement clips.
-    Promise.all([loadFBX(animPaths.walk), loadFBX(animPaths.jump)])
-      .then(([walkFbx, jumpFbx]) => {
-        const walkClip = inferAnimationClip(walkFbx);
-        const jumpClip = inferAnimationClip(jumpFbx);
-
-        if (!walkClip || !jumpClip) {
-          console.warn('[boot-debug] walk/jump clips missing; movement animation disabled');
-          return;
-        }
-
-        // These clips come from the same rig family; direct binding is more stable than retargeting here.
-        actions.walk = mixer.clipAction(walkClip);
-        actions.jump = mixer.clipAction(jumpClip);
-        actions.walk.setLoop(THREE.LoopRepeat);
-        actions.jump.setLoop(THREE.LoopOnce, 1);
-        actions.jump.clampWhenFinished = true;
-
-        console.log('[boot-debug] walk/jump animations ready (deferred)');
-      })
-      .catch((error) => {
-        console.warn('[boot-debug] walk/jump deferred load failed; continuing with idle-only animation', error);
-      });
+    // Optional movement clips are loaded later after world staging settles.
 
     // Reframe camera once character bounds are known.
     const box = new THREE.Box3().setFromObject(player);
@@ -681,6 +678,39 @@ async function loadCharacterAndAnimations() {
     scene.add(player);
 
     markBootStage('characterReady', 'fallback-capsule');
+  }
+}
+
+async function loadDeferredMovementAnimations() {
+  if (!mixer || !player) {
+    console.warn('[boot-debug] loadDeferredMovementAnimations skipped: player or mixer not ready');
+    return;
+  }
+
+  const startedAt = performance.now();
+  console.log('[boot-debug] deferred movement clip load: start');
+
+  try {
+    const [walkFbx, jumpFbx] = await Promise.all([loadFBX(animPaths.walk), loadFBX(animPaths.jump)]);
+    const walkClip = inferAnimationClip(walkFbx);
+    const jumpClip = inferAnimationClip(jumpFbx);
+
+    if (!walkClip || !jumpClip) {
+      console.warn('[boot-debug] walk/jump clips missing; movement animation disabled');
+      return;
+    }
+
+    actions.walk = mixer.clipAction(walkClip);
+    actions.jump = mixer.clipAction(jumpClip);
+    actions.walk.setLoop(THREE.LoopRepeat);
+    actions.jump.setLoop(THREE.LoopOnce, 1);
+    actions.jump.clampWhenFinished = true;
+
+    const elapsed = Math.round(performance.now() - startedAt);
+    console.log(`[boot-debug] deferred movement clip load: complete (${elapsed}ms)`);
+  } catch (error) {
+    const elapsed = Math.round(performance.now() - startedAt);
+    console.warn(`[boot-debug] deferred movement clip load: failed (${elapsed}ms); continuing with idle-only animation`, error);
   }
 }
 
@@ -1155,8 +1185,9 @@ function render() {
       'firstFrameWithCharacterRendered',
       `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
     );
-    maybeHideBootOverlayAfterCharacterFrame();
   }
+
+  maybeHideBootOverlayAfterFirstRenderableFrame();
 
   requestAnimationFrame(render);
 }
@@ -1189,22 +1220,45 @@ window.addEventListener('resize', () => {
     // Start rendering immediately so world/terrain still appears even if character load is slow.
     ensureRenderLoopStarted('post-core-ui');
 
+    console.log('[boot-debug] init chain: load character first, then world dressing, then deferred movement clips');
+
     setBootLoadingStatus('Loading player rig…');
+
+    const characterStartedAt = performance.now();
     await loadCharacterAndAnimations();
+    console.log(`[boot-debug] loadCharacterAndAnimations: complete (${Math.round(performance.now() - characterStartedAt)}ms)`);
 
     setBootLoadingStatus('Loading world dressing…');
-    const stageTasks = [createSetDressing(), createLandmarks()];
-    const stageNames = ['createSetDressing', 'createLandmarks'];
-    const stageResults = await Promise.allSettled(stageTasks);
 
-    stageResults.forEach((result, index) => {
-      const stageName = stageNames[index];
-      if (result.status === 'fulfilled') {
-        console.log(`[boot-debug] ${stageName}: complete`);
-      } else {
-        console.error(`[boot-debug] ${stageName}: failed`, result.reason);
-      }
+    const stageFactories = [
+      { name: 'createSetDressing', run: createSetDressing },
+      { name: 'createLandmarks', run: createLandmarks }
+    ];
+
+    const stageTasks = stageFactories.map(({ name, run }) => {
+      const startedAt = performance.now();
+      console.log(`[boot-debug] ${name}: queued`);
+      return run()
+        .then(() => {
+          const elapsed = Math.round(performance.now() - startedAt);
+          console.log(`[boot-debug] ${name}: complete (${elapsed}ms)`);
+          return { name, status: 'fulfilled' };
+        })
+        .catch((error) => {
+          const elapsed = Math.round(performance.now() - startedAt);
+          console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
+          return { name, status: 'rejected', reason: error };
+        });
     });
+
+    const worldResults = await Promise.all(stageTasks);
+    const failedWorldStages = worldResults.filter((result) => result.status === 'rejected');
+    if (failedWorldStages.length > 0) {
+      console.warn('[boot-debug] world stages settled with failures', failedWorldStages.map((result) => result.name));
+    }
+
+    setBootLoadingStatus('Loading movement clips…');
+    await loadDeferredMovementAnimations();
 
     const elapsed = Math.round(performance.now() - bootStartedAt);
     console.log(`[boot-debug] boot sequence settled in ${elapsed}ms | stages=${JSON.stringify(bootStages)}`);
