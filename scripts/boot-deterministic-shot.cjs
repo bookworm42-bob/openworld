@@ -3,6 +3,8 @@ const path = require('path');
 
 (async () => {
   let browser;
+  let page;
+  const outPath = path.join('artifacts', 'boot-deterministic.png');
   try {
     browser = await chromium.launch({
       headless: true,
@@ -17,7 +19,7 @@ const path = require('path');
       ],
     });
 
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     page.on('console', (m) => {
       if (m.type() === 'error') console.log('BROWSER_ERROR:', m.text());
     });
@@ -43,11 +45,16 @@ const path = require('path');
       overlayVisible: !!document.getElementById('boot-loading-overlay')
     }));
 
-    const outPath = path.join('artifacts', 'boot-deterministic.png');
     await page.screenshot({ path: outPath });
     console.log('BOOT_CHECK_OK', JSON.stringify(debug));
     console.log('SHOT', outPath);
   } catch (e) {
+    if (page) {
+      try {
+        await page.screenshot({ path: outPath });
+        console.log('SHOT', outPath);
+      } catch {}
+    }
     console.error('BOOT_CHECK_FAIL', e && e.stack ? e.stack : e);
     process.exitCode = 1;
   } finally {
