@@ -866,26 +866,38 @@ function createLandmarkWindmillFallback(scale, materials) {
   return group;
 }
 
-async function loadGLTFEntriesConcurrent(entries, label) {
-  const settled = await Promise.all(
-    entries.map(async ([type, path]) => {
+async function loadGLTFEntriesConcurrent(entries, label, maxConcurrent = 2) {
+  const concurrency = Math.max(1, Math.min(entries.length, Math.floor(maxConcurrent) || 1));
+  console.log(`[boot-debug] ${label} queue: ${entries.length} asset(s), maxConcurrent=${concurrency}`);
+
+  const results = new Array(entries.length);
+  let cursor = 0;
+
+  async function worker(workerIndex) {
+    while (true) {
+      const jobIndex = cursor;
+      cursor += 1;
+      if (jobIndex >= entries.length) return;
+
+      const [type, path] = entries[jobIndex];
       const startedAt = performance.now();
-      console.log(`[boot-debug] ${label} asset queued: ${type} (${path})`);
+      console.log(`[boot-debug] ${label} worker#${workerIndex} start: ${type} (${path})`);
 
       try {
         const gltf = await loadGLTF(path);
         const elapsed = Math.round(performance.now() - startedAt);
-        console.log(`[boot-debug] ${label} asset complete: ${type} (${elapsed}ms)`);
-        return [type, gltf];
+        console.log(`[boot-debug] ${label} worker#${workerIndex} complete: ${type} (${elapsed}ms)`);
+        results[jobIndex] = [type, gltf];
       } catch (error) {
         const elapsed = Math.round(performance.now() - startedAt);
-        console.warn(`[boot-debug] ${label} asset failed: ${type} (${elapsed}ms)`, error);
-        return [type, null];
+        console.warn(`[boot-debug] ${label} worker#${workerIndex} failed: ${type} (${elapsed}ms)`, error);
+        results[jobIndex] = [type, null];
       }
-    })
-  );
+    }
+  }
 
-  return Object.fromEntries(settled);
+  await Promise.all(Array.from({ length: concurrency }, (_, index) => worker(index + 1)));
+  return Object.fromEntries(results);
 }
 
 async function loadLandmarkAssets() {
