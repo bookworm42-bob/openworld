@@ -239,12 +239,21 @@ const bootStages = {
   setDressingReady: false,
   landmarksReady: false,
   renderStarted: false,
-  firstFrameRendered: false
+  firstFrameRendered: false,
+  firstFrameWithCharacterRendered: false
 };
 
 function markBootStage(stage, details = '') {
   const elapsed = Math.round(performance.now() - bootLoading.startedAtMs);
   bootStages[stage] = true;
+  window.__BOOT_DEBUG__ = {
+    ...(window.__BOOT_DEBUG__ || {}),
+    startedAtMs: bootLoading.startedAtMs,
+    stages: { ...bootStages },
+    lastStage: stage,
+    elapsedMs: elapsed,
+    details
+  };
   console.log(`[boot-debug] stage=${stage} at ${elapsed}ms${details ? ` | ${details}` : ''}`);
 }
 
@@ -285,6 +294,11 @@ function hideBootLoadingOverlay(mode = 'complete') {
   bootLoading.overlayEl.remove();
   const elapsed = Math.round(performance.now() - bootLoading.startedAtMs);
   console.log(`[boot] loading overlay removed (${mode}) after ${elapsed}ms`);
+}
+
+function maybeHideBootOverlayAfterCharacterFrame() {
+  if (!bootStages.characterReady || !bootStages.firstFrameWithCharacterRendered) return;
+  hideBootLoadingOverlay('character-first-frame');
 }
 
 createBootLoadingOverlay();
@@ -507,8 +521,22 @@ async function loadFBX(path) {
   console.log(`[boot-debug] FBX load start: ${path}`);
 
   try {
+    let lastProgressBucket = -1;
     const result = await new Promise((resolve, reject) => {
-      loader.load(path, resolve, undefined, reject);
+      loader.load(
+        path,
+        resolve,
+        (event) => {
+          if (!event || !Number.isFinite(event.total) || event.total <= 0) return;
+          const ratio = event.loaded / event.total;
+          const bucket = Math.min(10, Math.max(0, Math.floor(ratio * 10)));
+          if (bucket !== lastProgressBucket) {
+            lastProgressBucket = bucket;
+            console.log(`[boot-debug] FBX progress ${path}: ${Math.round(ratio * 100)}% (${event.loaded}/${event.total})`);
+          }
+        },
+        reject
+      );
     });
     const elapsed = Math.round(performance.now() - startedAt);
     console.log(`[boot-debug] FBX load done: ${path} (${elapsed}ms)`);
@@ -1100,6 +1128,8 @@ function updatePlayer(delta) {
   }
 }
 
+let renderLoopStarted = false;
+
 function render() {
   const delta = clock.getDelta();
   const scaledDelta = delta * timeScale;
@@ -1118,10 +1148,29 @@ function render() {
       'firstFrameRendered',
       `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
     );
-    hideBootLoadingOverlay('first-frame');
+  }
+
+  if (bootStages.characterReady && !bootStages.firstFrameWithCharacterRendered) {
+    markBootStage(
+      'firstFrameWithCharacterRendered',
+      `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
+    );
+    maybeHideBootOverlayAfterCharacterFrame();
   }
 
   requestAnimationFrame(render);
+}
+
+function ensureRenderLoopStarted(reason = 'unknown') {
+  if (renderLoopStarted) {
+    console.log(`[boot-debug] render loop already started (${reason})`);
+    return;
+  }
+
+  renderLoopStarted = true;
+  console.log(`[boot-debug] starting render loop (${reason})`);
+  render();
+  markBootStage('renderStarted', `${reason} | camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`);
 }
 
 window.addEventListener('resize', () => {
@@ -1137,12 +1186,11 @@ window.addEventListener('resize', () => {
     createInteractable();
     markBootStage('coreUiReady', 'HUD + interactable created');
 
+    // Start rendering immediately so world/terrain still appears even if character load is slow.
+    ensureRenderLoopStarted('post-core-ui');
+
     setBootLoadingStatus('Loading player rig…');
     await loadCharacterAndAnimations();
-
-    console.log('[boot-debug] character ready, starting render loop');
-    render();
-    markBootStage('renderStarted', `camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`);
 
     setBootLoadingStatus('Loading world dressing…');
     const stageTasks = [createSetDressing(), createLandmarks()];
