@@ -331,10 +331,11 @@ function hideBootLoadingOverlay(mode = 'complete') {
 function maybeHideBootOverlayAfterFirstRenderableFrame() {
   const worldReady = bootStages.setDressingReady && bootStages.landmarksReady;
   const canHideAfterWorldFrame = worldReady && bootStages.firstFrameRendered;
+  const canHideAfterCharacterFrame = bootStages.characterReady && bootStages.firstFrameWithCharacterRendered;
 
-  if (!canHideAfterWorldFrame) return;
+  if (!canHideAfterWorldFrame && !canHideAfterCharacterFrame) return;
 
-  hideBootLoadingOverlay('world-first-frame');
+  hideBootLoadingOverlay(canHideAfterWorldFrame ? 'world-first-frame' : 'character-first-frame');
 }
 
 createBootLoadingOverlay();
@@ -1356,7 +1357,7 @@ window.addEventListener('resize', () => {
     // Start rendering immediately so world/terrain still appears even if character load is slow.
     ensureRenderLoopStarted('post-core-ui');
 
-    console.log('[boot-debug] init chain: prioritize world lane before player lane to avoid FBX decode contention starving world staging');
+    console.log('[boot-debug] init chain: start world lane and player lane independently to avoid optional world staging stalls blocking character boot');
 
     setBootLoadingStatus('Loading world dressing…');
 
@@ -1365,34 +1366,53 @@ window.addEventListener('resize', () => {
       { name: 'createLandmarks', run: createLandmarks }
     ];
 
-    const worldStartedAt = performance.now();
-    const worldResults = [];
-    for (const { name, run } of stageFactories) {
-      const startedAt = performance.now();
-      console.log(`[boot-debug] ${name}: queued (sequential world lane) | inFlight before run fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
-      try {
-        await run();
-        const elapsed = Math.round(performance.now() - startedAt);
-        console.log(`[boot-debug] ${name}: complete (${elapsed}ms) | inFlight after run fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
-        worldResults.push({ name, status: 'fulfilled' });
-      } catch (error) {
-        const elapsed = Math.round(performance.now() - startedAt);
-        console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
-        worldResults.push({ name, status: 'rejected', reason: error });
+    const worldLanePromise = (async () => {
+      const worldStartedAt = performance.now();
+      const worldResults = [];
+
+      for (const { name, run } of stageFactories) {
+        const startedAt = performance.now();
+        console.log(`[boot-debug] ${name}: queued (sequential world lane) | inFlight before run fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
+        try {
+          await run();
+          const elapsed = Math.round(performance.now() - startedAt);
+          console.log(`[boot-debug] ${name}: complete (${elapsed}ms) | inFlight after run fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
+          worldResults.push({ name, status: 'fulfilled' });
+        } catch (error) {
+          const elapsed = Math.round(performance.now() - startedAt);
+          console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
+          worldResults.push({ name, status: 'rejected', reason: error });
+        }
       }
-    }
 
-    const worldElapsed = Math.round(performance.now() - worldStartedAt);
-    console.log(`[boot-debug] world lane: settled (${worldElapsed}ms)`);
+      const worldElapsed = Math.round(performance.now() - worldStartedAt);
+      console.log(`[boot-debug] world lane: settled (${worldElapsed}ms)`);
 
-    const failedWorldStages = worldResults.filter((result) => result.status === 'rejected');
-    if (failedWorldStages.length > 0) {
-      console.warn('[boot-debug] world stages settled with failures', failedWorldStages.map((result) => result.name));
-    }
+      const failedWorldStages = worldResults.filter((result) => result.status === 'rejected');
+      if (failedWorldStages.length > 0) {
+        console.warn('[boot-debug] world stages settled with failures', failedWorldStages.map((result) => result.name));
+      }
+
+      return worldResults;
+    })();
+
+    let worldLaneSettled = false;
+    worldLanePromise.finally(() => {
+      worldLaneSettled = true;
+    });
+
+    setTimeout(() => {
+      if (!worldLaneSettled) {
+        console.warn('[boot-debug] world lane still pending after 30s; character lane continues independently', {
+          inFlight: { ...loadDebugState },
+          stages: { ...bootStages }
+        });
+      }
+    }, 30000);
 
     setBootLoadingStatus('Loading player rig…');
     const characterStartedAt = performance.now();
-    console.log('[boot-debug] character lane: queued after world lane settled');
+    console.log('[boot-debug] character lane: queued without waiting for world lane settle');
     await loadCharacterAndAnimations();
     console.log(`[boot-debug] character lane: settled (${Math.round(performance.now() - characterStartedAt)}ms) | inFlight now fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
@@ -1401,8 +1421,13 @@ window.addEventListener('resize', () => {
 
     const elapsed = Math.round(performance.now() - bootStartedAt);
     console.log(
-      `[boot-debug] boot sequence settled in ${elapsed}ms | stages=${JSON.stringify(bootStages)} | peakInFlight fbx=${loadDebugState.peakFbxInFlight} gltf=${loadDebugState.peakGltfInFlight}`
+      `[boot-debug] critical boot settled in ${elapsed}ms | stages=${JSON.stringify(bootStages)} | peakInFlight fbx=${loadDebugState.peakFbxInFlight} gltf=${loadDebugState.peakGltfInFlight}`
     );
+
+    void worldLanePromise.then(() => {
+      const worldElapsed = Math.round(performance.now() - bootStartedAt);
+      console.log(`[boot-debug] full boot settled in ${worldElapsed}ms (world lane included)`);
+    });
     window.__BOOT_DEBUG__ = {
       ...(window.__BOOT_DEBUG__ || {}),
       peakInFlight: {
