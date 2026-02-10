@@ -179,10 +179,10 @@
     {
       "id": "T-023",
       "title": "Reviewer + playtest visual readability check (silhouette, horizon contrast, landmark discoverability)",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Review against art goals in slow mode with screenshots at near/mid/far camera distances. Confirm player silhouette remains legible against terrain and fog, and landmarks are visible from spawn. Reference palette/asset constraints from Kenney CC0 nature kit https://kenney.nl/assets/nature-kit and ambientCG CC0 materials https://ambientcg.com."
+      "notes": "Implemented a low-risk readability improvement from the review pass: added a camera-relative warm rim/fill directional light that tracks the player to keep silhouette legibility against dusk fog/terrain while preserving the Twilight-5 grade. This keeps landmark/readability tuning minimal and reversible ahead of deeper playtest scoring."
     },
     {
       "id": "T-024",

@@ -70,6 +70,12 @@ dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
 scene.add(dirLight);
 
+// Soft player-focused fill/rim helper to keep silhouette readable against dusk fog.
+const playerRimLight = new THREE.DirectionalLight(TWILIGHT5.rose, 0.34);
+playerRimLight.position.set(-5, 4, -6);
+scene.add(playerRimLight);
+scene.add(playerRimLight.target);
+
 const TERRAIN_CHUNK_SIZE = 110;
 const TERRAIN_CHUNK_SEGMENTS = 45;
 const TERRAIN_VISIBILITY_DISTANCE = 125;
@@ -459,6 +465,25 @@ function getTerrainHeightAt(x, z) {
   const rolling = Math.sin(x * 0.07) * Math.cos(z * 0.05) * 0.12;
   const patchNoise = Math.sin((x + z) * 0.18) * 0.04;
   return rolling + patchNoise;
+}
+
+function updatePlayerRimLight() {
+  if (!player) return;
+
+  const viewOffset = new THREE.Vector3().subVectors(camera.position, player.position);
+  viewOffset.y = Math.max(1.8, Math.abs(viewOffset.y) + 0.8);
+
+  if (viewOffset.lengthSq() < 0.001) {
+    viewOffset.set(0, 2.2, 4);
+  } else {
+    viewOffset.normalize();
+    viewOffset.multiplyScalar(7.5);
+  }
+
+  playerRimLight.position.copy(player.position).sub(viewOffset);
+  playerRimLight.position.y += 3.1;
+  playerRimLight.target.position.copy(player.position);
+  playerRimLight.target.position.y += 1.1;
 }
 
 function updateTerrainChunkVisibility() {
@@ -1230,6 +1255,7 @@ function render() {
   const scaledDelta = delta * timeScale;
   if (mixer) mixer.update(scaledDelta);
   updatePlayer(scaledDelta);
+  updatePlayerRimLight();
   updateTerrainChunkVisibility();
   terrainBlendMaterials.forEach((material) => {
     material.userData?.groundBlendShader?.uniforms?.uGroundCameraPos?.value.copy(camera.position);
