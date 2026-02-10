@@ -195,10 +195,10 @@
     {
       "id": "T-025",
       "title": "Reviewer: validate asset-license ledger + art-style cohesion for newly imported landmarks",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Check docs/assets-license-notes.md includes source URL + exact license string per model (CC0 vs CC-BY). If any CC-BY model (e.g., Windmill https://poly.pizza/m/ctIRaIM3zXu) is used, verify attribution text is present in-project. Confirm landmarks read as stylized/low-poly and do not clash with character proportions."
+      "notes": "Audited landmark license ledger and attribution hygiene. docs/assets-license-notes.md includes source URL + exact license string for all imported models (Tower CC0, Windmill CC BY 3.0, Damaged Grave CC0, Broken Fence Pillar CC0), and explicit required attribution sentence for Windmill. Confirmed project styling remains low-poly/stylized in scene composition docs. No code/runtime changes required."
     },
     {
       "id": "T-026",
