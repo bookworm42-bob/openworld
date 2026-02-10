@@ -226,8 +226,65 @@ buildTerrainChunk(halfChunk, -halfChunk);
 buildTerrainChunk(-halfChunk, halfChunk);
 buildTerrainChunk(halfChunk, halfChunk);
 
-const loader = new FBXLoader();
-const gltfLoader = new GLTFLoader();
+const bootLoading = {
+  startedAtMs: performance.now(),
+  overlayEl: null,
+  statusEl: null,
+  hidden: false
+};
+
+function createBootLoadingOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'boot-loading-overlay';
+
+  const spinner = document.createElement('div');
+  spinner.id = 'boot-loading-spinner';
+  overlay.appendChild(spinner);
+
+  const status = document.createElement('div');
+  status.id = 'boot-loading-status';
+  status.textContent = 'Loading world assets…';
+  overlay.appendChild(status);
+
+  document.body.appendChild(overlay);
+  bootLoading.overlayEl = overlay;
+  bootLoading.statusEl = status;
+}
+
+function setBootLoadingStatus(text) {
+  if (!bootLoading.statusEl || bootLoading.hidden) return;
+  bootLoading.statusEl.textContent = text;
+}
+
+function hideBootLoadingOverlay(mode = 'complete') {
+  if (!bootLoading.overlayEl || bootLoading.hidden) return;
+  bootLoading.hidden = true;
+  bootLoading.overlayEl.remove();
+  const elapsed = Math.round(performance.now() - bootLoading.startedAtMs);
+  console.log(`[boot] loading overlay removed (${mode}) after ${elapsed}ms`);
+}
+
+createBootLoadingOverlay();
+
+setTimeout(() => {
+  if (bootLoading.hidden) {
+    console.log('[boot] 120s check: loading overlay already removed.');
+  } else {
+    console.error('[boot] 120s check: loading overlay still visible.');
+  }
+}, 120000);
+
+const assetLoadingManager = new THREE.LoadingManager();
+assetLoadingManager.onStart = () => setBootLoadingStatus('Loading world assets…');
+assetLoadingManager.onProgress = (_url, loaded, total) => {
+  if (total > 0) setBootLoadingStatus(`Loading world assets… (${loaded}/${total})`);
+};
+assetLoadingManager.onError = (url) => {
+  console.error('[boot] asset load error:', url);
+};
+
+const loader = new FBXLoader(assetLoadingManager);
+const gltfLoader = new GLTFLoader(assetLoadingManager);
 const clock = new THREE.Clock();
 
 const DEFAULT_TIME_SCALE = 1;
@@ -369,15 +426,39 @@ function inferAnimationClip(object3d) {
 }
 
 async function loadFBX(path) {
-  return await new Promise((resolve, reject) => {
-    loader.load(path, resolve, undefined, reject);
-  });
+  const startedAt = performance.now();
+  console.log(`[boot-debug] FBX load start: ${path}`);
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      loader.load(path, resolve, undefined, reject);
+    });
+    const elapsed = Math.round(performance.now() - startedAt);
+    console.log(`[boot-debug] FBX load done: ${path} (${elapsed}ms)`);
+    return result;
+  } catch (error) {
+    const elapsed = Math.round(performance.now() - startedAt);
+    console.error(`[boot-debug] FBX load failed: ${path} (${elapsed}ms)`, error);
+    throw error;
+  }
 }
 
 async function loadGLTF(path) {
-  return await new Promise((resolve, reject) => {
-    gltfLoader.load(path, resolve, undefined, reject);
-  });
+  const startedAt = performance.now();
+  console.log(`[boot-debug] GLTF load start: ${path}`);
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      gltfLoader.load(path, resolve, undefined, reject);
+    });
+    const elapsed = Math.round(performance.now() - startedAt);
+    console.log(`[boot-debug] GLTF load done: ${path} (${elapsed}ms)`);
+    return result;
+  } catch (error) {
+    const elapsed = Math.round(performance.now() - startedAt);
+    console.error(`[boot-debug] GLTF load failed: ${path} (${elapsed}ms)`, error);
+    throw error;
+  }
 }
 
 function applyWarmRimAccent(material) {
@@ -411,8 +492,10 @@ function applyWarmRimAccent(material) {
 
 async function loadCharacterAndAnimations() {
   try {
+    console.log('[boot-debug] loadCharacterAndAnimations: start');
     // Load character once.
     player = await loadFBX(playerPath);
+    console.log('[boot-debug] player FBX loaded');
     player.position.set(0, 0, 0);
     player.traverse((child) => {
       if (child.isMesh) {
@@ -430,6 +513,7 @@ async function loadCharacterAndAnimations() {
       loadFBX(animPaths.walk),
       loadFBX(animPaths.jump)
     ]);
+    console.log('[boot-debug] walk/jump FBX loaded');
 
     const idleClip = inferAnimationClip(player);
     const walkClip = inferAnimationClip(walkFbx);
@@ -565,6 +649,7 @@ async function loadLandmarkAssets() {
 }
 
 async function createLandmarks() {
+  console.log('[boot-debug] createLandmarks: start');
   const stoneMaterial = applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: TWILIGHT5.slateBlue, roughness: 0.91, metalness: 0.03 }));
   const accentMaterial = applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: TWILIGHT5.rose, roughness: 0.74, metalness: 0.08 }));
   const materials = { stone: stoneMaterial, accent: accentMaterial };
@@ -608,6 +693,7 @@ async function createLandmarks() {
 }
 
 async function createSetDressing() {
+  console.log('[boot-debug] createSetDressing: start');
   const propAnchors = [
     { x: -6.5, z: -4.2, scale: 1.2 },
     { x: 7.4, z: 4.6, scale: 0.9 },
@@ -930,9 +1016,37 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-loadCharacterAndAnimations().finally(async () => {
-  await createSetDressing();
-  await createLandmarks();
-  createInteractable();
-  render();
-});
+(async () => {
+  const bootStartedAt = performance.now();
+
+  try {
+    createInteractable();
+    console.log('[boot-debug] scene core ready, starting render loop');
+    render();
+    hideBootLoadingOverlay('scene-ready');
+
+    const stageTasks = [
+      loadCharacterAndAnimations(),
+      createSetDressing(),
+      createLandmarks()
+    ];
+
+    const stageNames = ['loadCharacterAndAnimations', 'createSetDressing', 'createLandmarks'];
+    const stageResults = await Promise.allSettled(stageTasks);
+
+    stageResults.forEach((result, index) => {
+      const stageName = stageNames[index];
+      if (result.status === 'fulfilled') {
+        console.log(`[boot-debug] ${stageName}: complete`);
+      } else {
+        console.error(`[boot-debug] ${stageName}: failed`, result.reason);
+      }
+    });
+
+    const elapsed = Math.round(performance.now() - bootStartedAt);
+    console.log(`[boot-debug] boot sequence settled in ${elapsed}ms`);
+  } catch (error) {
+    console.error('[boot] failed to initialize world core:', error);
+    hideBootLoadingOverlay('error');
+  }
+})();
