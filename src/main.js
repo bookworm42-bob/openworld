@@ -863,30 +863,30 @@ function createLandmarkWindmillFallback(scale, materials) {
   return group;
 }
 
-async function loadGLTFEntriesSequential(entries, label) {
-  const results = [];
+async function loadGLTFEntriesConcurrent(entries, label) {
+  const settled = await Promise.all(
+    entries.map(async ([type, path]) => {
+      const startedAt = performance.now();
+      console.log(`[boot-debug] ${label} asset queued: ${type} (${path})`);
 
-  for (const [type, path] of entries) {
-    const startedAt = performance.now();
-    console.log(`[boot-debug] ${label} asset queued: ${type} (${path})`);
+      try {
+        const gltf = await loadGLTF(path);
+        const elapsed = Math.round(performance.now() - startedAt);
+        console.log(`[boot-debug] ${label} asset complete: ${type} (${elapsed}ms)`);
+        return [type, gltf];
+      } catch (error) {
+        const elapsed = Math.round(performance.now() - startedAt);
+        console.warn(`[boot-debug] ${label} asset failed: ${type} (${elapsed}ms)`, error);
+        return [type, null];
+      }
+    })
+  );
 
-    try {
-      const gltf = await loadGLTF(path);
-      const elapsed = Math.round(performance.now() - startedAt);
-      console.log(`[boot-debug] ${label} asset complete: ${type} (${elapsed}ms)`);
-      results.push([type, gltf]);
-    } catch (error) {
-      const elapsed = Math.round(performance.now() - startedAt);
-      console.warn(`[boot-debug] ${label} asset failed: ${type} (${elapsed}ms)`, error);
-      results.push([type, null]);
-    }
-  }
-
-  return Object.fromEntries(results);
+  return Object.fromEntries(settled);
 }
 
 async function loadLandmarkAssets() {
-  const rawAssets = await loadGLTFEntriesSequential(Object.entries(landmarkAssetPaths), 'landmark');
+  const rawAssets = await loadGLTFEntriesConcurrent(Object.entries(landmarkAssetPaths), 'landmark');
   const normalized = {};
 
   Object.entries(rawAssets).forEach(([type, gltf]) => {
@@ -964,7 +964,7 @@ async function createSetDressing() {
   ];
 
   try {
-    const stagedGlbAssets = await loadGLTFEntriesSequential(
+    const stagedGlbAssets = await loadGLTFEntriesConcurrent(
       [
         ['tree', natureKitPaths.tree],
         ['rock', natureKitPaths.rock],
@@ -1341,13 +1341,7 @@ window.addEventListener('resize', () => {
     // Start rendering immediately so world/terrain still appears even if character load is slow.
     ensureRenderLoopStarted('post-core-ui');
 
-    console.log('[boot-debug] init chain: serialize character -> world staging to avoid high asset decode contention, then deferred movement clips');
-
-    setBootLoadingStatus('Loading player rig…');
-
-    const characterStartedAt = performance.now();
-    await loadCharacterAndAnimations();
-    console.log(`[boot-debug] loadCharacterAndAnimations: complete (${Math.round(performance.now() - characterStartedAt)}ms) | inFlight now fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
+    console.log('[boot-debug] init chain: prioritize world lane before player lane to avoid FBX decode contention starving world staging');
 
     setBootLoadingStatus('Loading world dressing…');
 
@@ -1356,10 +1350,11 @@ window.addEventListener('resize', () => {
       { name: 'createLandmarks', run: createLandmarks }
     ];
 
+    const worldStartedAt = performance.now();
     const worldResults = [];
     for (const { name, run } of stageFactories) {
       const startedAt = performance.now();
-      console.log(`[boot-debug] ${name}: queued (sequential) | inFlight before run fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
+      console.log(`[boot-debug] ${name}: queued (sequential world lane) | inFlight before run fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
       try {
         await run();
         const elapsed = Math.round(performance.now() - startedAt);
@@ -1372,10 +1367,19 @@ window.addEventListener('resize', () => {
       }
     }
 
+    const worldElapsed = Math.round(performance.now() - worldStartedAt);
+    console.log(`[boot-debug] world lane: settled (${worldElapsed}ms)`);
+
     const failedWorldStages = worldResults.filter((result) => result.status === 'rejected');
     if (failedWorldStages.length > 0) {
       console.warn('[boot-debug] world stages settled with failures', failedWorldStages.map((result) => result.name));
     }
+
+    setBootLoadingStatus('Loading player rig…');
+    const characterStartedAt = performance.now();
+    console.log('[boot-debug] character lane: queued after world lane settled');
+    await loadCharacterAndAnimations();
+    console.log(`[boot-debug] character lane: settled (${Math.round(performance.now() - characterStartedAt)}ms) | inFlight now fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
     setBootLoadingStatus('Loading movement clips…');
     await loadDeferredMovementAnimations();
