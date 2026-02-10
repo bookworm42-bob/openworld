@@ -17,11 +17,18 @@ app.appendChild(renderer.domElement);
 
 renderer.domElement.addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
-  console.error('[boot-debug] WebGL context lost during boot/runtime');
+  const elapsed = Math.round(performance.now());
+  const priorCount = window.__BOOT_DEBUG__?.contextLossCount || 0;
+  console.error('[boot-debug] WebGL context lost during boot/runtime', {
+    elapsedMs: elapsed,
+    contextLossCount: priorCount + 1,
+    stages: { ...(window.__BOOT_DEBUG__?.stages || {}) }
+  });
   window.__BOOT_DEBUG__ = {
     ...(window.__BOOT_DEBUG__ || {}),
     contextLost: true,
-    contextLostAtMs: Math.round(performance.now())
+    contextLossCount: priorCount + 1,
+    contextLostAtMs: elapsed
   };
 });
 
@@ -814,20 +821,37 @@ function createLandmarkWindmillFallback(scale, materials) {
   return group;
 }
 
-async function loadLandmarkAssets() {
-  const entries = await Promise.all(
-    Object.entries(landmarkAssetPaths).map(async ([type, path]) => {
-      try {
-        const gltf = await loadGLTF(path);
-        return [type, gltf.scene];
-      } catch (error) {
-        console.warn(`Landmark asset failed to load for ${type}, using primitive fallback:`, error);
-        return [type, null];
-      }
-    })
-  );
+async function loadGLTFEntriesSequential(entries, label) {
+  const results = [];
 
-  return Object.fromEntries(entries);
+  for (const [type, path] of entries) {
+    const startedAt = performance.now();
+    console.log(`[boot-debug] ${label} asset queued: ${type} (${path})`);
+
+    try {
+      const gltf = await loadGLTF(path);
+      const elapsed = Math.round(performance.now() - startedAt);
+      console.log(`[boot-debug] ${label} asset complete: ${type} (${elapsed}ms)`);
+      results.push([type, gltf]);
+    } catch (error) {
+      const elapsed = Math.round(performance.now() - startedAt);
+      console.warn(`[boot-debug] ${label} asset failed: ${type} (${elapsed}ms)`, error);
+      results.push([type, null]);
+    }
+  }
+
+  return Object.fromEntries(results);
+}
+
+async function loadLandmarkAssets() {
+  const rawAssets = await loadGLTFEntriesSequential(Object.entries(landmarkAssetPaths), 'landmark');
+  const normalized = {};
+
+  Object.entries(rawAssets).forEach(([type, gltf]) => {
+    normalized[type] = gltf?.scene || null;
+  });
+
+  return normalized;
 }
 
 async function createLandmarks() {
@@ -898,13 +922,26 @@ async function createSetDressing() {
   ];
 
   try {
-    const [treeGltf, rockGltf, logStackGltf, damagedGraveGltf, brokenFencePillarGltf] = await Promise.all([
-      loadGLTF(natureKitPaths.tree),
-      loadGLTF(natureKitPaths.rock),
-      loadGLTF(natureKitPaths.logStack),
-      loadGLTF(ruinAccentAssetPaths.damagedGrave),
-      loadGLTF(ruinAccentAssetPaths.brokenFencePillar)
-    ]);
+    const stagedGlbAssets = await loadGLTFEntriesSequential(
+      [
+        ['tree', natureKitPaths.tree],
+        ['rock', natureKitPaths.rock],
+        ['logStack', natureKitPaths.logStack],
+        ['damagedGrave', ruinAccentAssetPaths.damagedGrave],
+        ['brokenFencePillar', ruinAccentAssetPaths.brokenFencePillar]
+      ],
+      'set-dressing'
+    );
+
+    const treeGltf = stagedGlbAssets.tree;
+    const rockGltf = stagedGlbAssets.rock;
+    const logStackGltf = stagedGlbAssets.logStack;
+    const damagedGraveGltf = stagedGlbAssets.damagedGrave;
+    const brokenFencePillarGltf = stagedGlbAssets.brokenFencePillar;
+
+    if (!treeGltf || !rockGltf || !logStackGltf) {
+      throw new Error('Critical Nature Kit assets missing for set dressing.');
+    }
 
     const placeNatureProp = (source, { x, z, scale, rotation = 0 }) => {
       const mesh = source.scene.clone(true);
