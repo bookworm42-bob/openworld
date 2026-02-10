@@ -13,6 +13,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
 app.appendChild(renderer.domElement);
 
 renderer.domElement.addEventListener('webglcontextlost', (event) => {
@@ -63,15 +65,15 @@ controls.maxPolarAngle = Math.PI * 0.48;
 controls.minDistance = 3;
 controls.maxDistance = 18;
 
-scene.add(new THREE.HemisphereLight(TWILIGHT5.slateBlue, TWILIGHT5.night, 0.92));
-const dirLight = new THREE.DirectionalLight(TWILIGHT5.blush, 1.08);
+scene.add(new THREE.HemisphereLight(TWILIGHT5.slateBlue, TWILIGHT5.night, 1.08));
+const dirLight = new THREE.DirectionalLight(TWILIGHT5.blush, 1.28);
 dirLight.position.set(8, 16, 6);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
 scene.add(dirLight);
 
 // Soft player-focused fill/rim helper to keep silhouette readable against dusk fog.
-const playerRimLight = new THREE.DirectionalLight(TWILIGHT5.rose, 0.34);
+const playerRimLight = new THREE.DirectionalLight(TWILIGHT5.rose, 0.44);
 playerRimLight.position.set(-5, 4, -6);
 scene.add(playerRimLight);
 scene.add(playerRimLight.target);
@@ -585,6 +587,53 @@ function inferAnimationClip(object3d) {
   return found;
 }
 
+function reframeCameraFromPlayerBoundsSafe(playerObject) {
+  const box = new THREE.Box3().setFromObject(playerObject);
+  const center = new THREE.Vector3();
+  const size = new THREE.Vector3();
+
+  if (box.isEmpty()) {
+    console.warn('[boot-debug] camera reframe skipped due to empty player bounds');
+    return false;
+  }
+
+  box.getCenter(center);
+  box.getSize(size);
+
+  const hasFiniteCenter = Number.isFinite(center.x) && Number.isFinite(center.y) && Number.isFinite(center.z);
+  const hasFiniteSize = Number.isFinite(size.x) && Number.isFinite(size.y) && Number.isFinite(size.z);
+
+  const centerDistance = Math.hypot(center.x, center.y, center.z);
+  const maxSize = Math.max(size.x, size.y, size.z);
+  const suspiciousCenter = centerDistance > 40;
+  const suspiciousSize = maxSize > 20;
+
+  console.log('[boot-debug] camera reframe candidate', {
+    center: { x: Number(center.x.toFixed(3)), y: Number(center.y.toFixed(3)), z: Number(center.z.toFixed(3)) },
+    size: { x: Number(size.x.toFixed(3)), y: Number(size.y.toFixed(3)), z: Number(size.z.toFixed(3)) },
+    centerDistance: Number(centerDistance.toFixed(3)),
+    maxSize: Number(maxSize.toFixed(3))
+  });
+
+  if (!hasFiniteCenter || !hasFiniteSize || suspiciousCenter || suspiciousSize) {
+    console.warn('[boot-debug] camera reframe rejected; using spawn-safe framing', {
+      hasFiniteCenter,
+      hasFiniteSize,
+      suspiciousCenter,
+      suspiciousSize
+    });
+
+    const safeTarget = new THREE.Vector3(playerObject.position.x, playerObject.position.y + 1.1, playerObject.position.z);
+    controls.target.copy(safeTarget);
+    camera.position.set(safeTarget.x + 3.2, safeTarget.y + 2.2, safeTarget.z + 5.8);
+    return false;
+  }
+
+  controls.target.copy(center);
+  camera.position.set(center.x + 3.2, center.y + 2.2, center.z + 5.8);
+  return true;
+}
+
 async function loadFBX(path) {
   const startedAt = performance.now();
   loadDebugState.fbxInFlight += 1;
@@ -718,19 +767,7 @@ async function loadCharacterAndAnimations() {
     // Optional movement clips are loaded later after world staging settles.
 
     // Reframe camera once character bounds are known.
-    const box = new THREE.Box3().setFromObject(player);
-    const center = new THREE.Vector3();
-    if (!box.isEmpty()) {
-      box.getCenter(center);
-      if (Number.isFinite(center.x) && Number.isFinite(center.y) && Number.isFinite(center.z)) {
-        controls.target.copy(center);
-        camera.position.set(center.x + 3.2, center.y + 2.2, center.z + 5.8);
-      } else {
-        console.warn('[boot-debug] camera reframe skipped due to non-finite center', center);
-      }
-    } else {
-      console.warn('[boot-debug] camera reframe skipped due to empty player bounds');
-    }
+    reframeCameraFromPlayerBoundsSafe(player);
 
     markBootStage('characterReady', `sceneChildren=${scene.children.length}`);
   } catch (error) {
@@ -756,6 +793,13 @@ async function loadCharacterAndAnimations() {
     markBootStage('characterReady', 'fallback-capsule');
   }
 }
+
+const deferredMovementLoadState = {
+  started: false,
+  settled: false,
+  startReason: null,
+  startedAtMs: null
+};
 
 async function loadDeferredMovementAnimations() {
   if (!mixer || !player) {
@@ -788,6 +832,43 @@ async function loadDeferredMovementAnimations() {
     const elapsed = Math.round(performance.now() - startedAt);
     console.warn(`[boot-debug] deferred movement clip load: failed (${elapsed}ms); continuing with idle-only animation`, error);
   }
+}
+
+function maybeStartDeferredMovementAnimations(reason = 'unknown') {
+  if (deferredMovementLoadState.started) return;
+  if (!bootStages.characterReady || !bootStages.firstFrameWithCharacterRendered) return;
+
+  deferredMovementLoadState.started = true;
+  deferredMovementLoadState.startReason = reason;
+  deferredMovementLoadState.startedAtMs = Math.round(performance.now() - bootLoading.startedAtMs);
+
+  console.log(
+    `[boot-debug] deferred movement clip load: queued (${reason}) at ${deferredMovementLoadState.startedAtMs}ms | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`
+  );
+
+  window.__BOOT_DEBUG__ = {
+    ...(window.__BOOT_DEBUG__ || {}),
+    deferredMovement: {
+      started: true,
+      settled: false,
+      reason,
+      startedAtMs: deferredMovementLoadState.startedAtMs
+    }
+  };
+
+  void loadDeferredMovementAnimations().finally(() => {
+    deferredMovementLoadState.settled = true;
+    const elapsed = Math.round(performance.now() - bootLoading.startedAtMs);
+    window.__BOOT_DEBUG__ = {
+      ...(window.__BOOT_DEBUG__ || {}),
+      deferredMovement: {
+        ...(window.__BOOT_DEBUG__?.deferredMovement || {}),
+        settled: true,
+        settledAtMs: elapsed
+      }
+    };
+    console.log(`[boot-debug] deferred movement clip load: settled at ${elapsed}ms`);
+  });
 }
 
 function createLandmarkTower(scale, materials) {
@@ -1314,6 +1395,7 @@ function render() {
       }
     }
 
+    maybeStartDeferredMovementAnimations('first-character-frame');
     maybeHideBootOverlayAfterFirstRenderableFrame();
   } catch (error) {
     renderExceptionCount += 1;
@@ -1416,8 +1498,7 @@ window.addEventListener('resize', () => {
     await loadCharacterAndAnimations();
     console.log(`[boot-debug] character lane: settled (${Math.round(performance.now() - characterStartedAt)}ms) | inFlight now fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
-    setBootLoadingStatus('Loading movement clips…');
-    await loadDeferredMovementAnimations();
+    maybeStartDeferredMovementAnimations('post-character-lane-settled');
 
     const elapsed = Math.round(performance.now() - bootStartedAt);
     console.log(
