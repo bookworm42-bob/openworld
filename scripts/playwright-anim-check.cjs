@@ -24,10 +24,12 @@ const path = require('path');
     await page.waitForTimeout(2500);
 
     const webglOk = await page.evaluate(() => {
-      const c = document.querySelector('canvas') || document.createElement('canvas');
-      return !!(c.getContext('webgl') || c.getContext('experimental-webgl'));
+      const c = document.querySelector('canvas');
+      if (!c) return false;
+      const gl = c.getContext('webgl2');
+      return !!gl;
     });
-    console.log('WEBGL_OK:', webglOk);
+    console.log('WEBGL2_OK:', webglOk);
 
     await page.screenshot({ path: path.join('artifacts', 'step-1-idle.png') });
 

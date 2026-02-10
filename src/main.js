@@ -233,6 +233,21 @@ const bootLoading = {
   hidden: false
 };
 
+const bootStages = {
+  coreUiReady: false,
+  characterReady: false,
+  setDressingReady: false,
+  landmarksReady: false,
+  renderStarted: false,
+  firstFrameRendered: false
+};
+
+function markBootStage(stage, details = '') {
+  const elapsed = Math.round(performance.now() - bootLoading.startedAtMs);
+  bootStages[stage] = true;
+  console.log(`[boot-debug] stage=${stage} at ${elapsed}ms${details ? ` | ${details}` : ''}`);
+}
+
 function createBootLoadingOverlay() {
   const overlay = document.createElement('div');
   overlay.id = 'boot-loading-overlay';
@@ -403,17 +418,31 @@ function setAction(nextName, fade = 0.2) {
 
 function normalizePlayerScaleAndGround(object3d, targetHeight = 1.8) {
   const box = new THREE.Box3().setFromObject(object3d);
+  if (box.isEmpty()) {
+    console.warn('[boot-debug] normalizePlayerScaleAndGround: empty bounds, skipping normalization');
+    return false;
+  }
+
   const size = new THREE.Vector3();
   box.getSize(size);
 
-  if (size.y > 0.0001) {
-    const scale = targetHeight / size.y;
-    object3d.scale.multiplyScalar(scale);
+  if (!Number.isFinite(size.y) || size.y <= 0.0001) {
+    console.warn('[boot-debug] normalizePlayerScaleAndGround: invalid size.y, skipping normalization', size.y);
+    return false;
   }
+
+  const scale = targetHeight / size.y;
+  object3d.scale.multiplyScalar(scale);
 
   // Recompute and set feet on y=0.
   box.setFromObject(object3d);
+  if (!Number.isFinite(box.min.y)) {
+    console.warn('[boot-debug] normalizePlayerScaleAndGround: invalid min.y after scaling, skipping ground snap');
+    return false;
+  }
+
   object3d.position.y -= box.min.y;
+  return true;
 }
 
 function inferAnimationClip(object3d) {
@@ -503,8 +532,12 @@ async function loadCharacterAndAnimations() {
         child.receiveShadow = true;
       }
     });
+
     scene.add(player);
-    normalizePlayerScaleAndGround(player);
+    const normalizedOk = normalizePlayerScaleAndGround(player);
+    if (!normalizedOk) {
+      throw new Error('Player bounds invalid after FBX load; aborting rig setup for safe fallback.');
+    }
 
     mixer = new THREE.AnimationMixer(player);
 
@@ -538,9 +571,19 @@ async function loadCharacterAndAnimations() {
     // Reframe camera once character bounds are known.
     const box = new THREE.Box3().setFromObject(player);
     const center = new THREE.Vector3();
-    box.getCenter(center);
-    controls.target.copy(center);
-    camera.position.set(center.x + 3.2, center.y + 2.2, center.z + 5.8);
+    if (!box.isEmpty()) {
+      box.getCenter(center);
+      if (Number.isFinite(center.x) && Number.isFinite(center.y) && Number.isFinite(center.z)) {
+        controls.target.copy(center);
+        camera.position.set(center.x + 3.2, center.y + 2.2, center.z + 5.8);
+      } else {
+        console.warn('[boot-debug] camera reframe skipped due to non-finite center', center);
+      }
+    } else {
+      console.warn('[boot-debug] camera reframe skipped due to empty player bounds');
+    }
+
+    markBootStage('characterReady', `sceneChildren=${scene.children.length}`);
   } catch (error) {
     console.error('Failed to load model/animations from ./3d_models/boy:', error);
 
@@ -552,6 +595,8 @@ async function loadCharacterAndAnimations() {
     player.position.set(0, 1, 0);
     player.castShadow = true;
     scene.add(player);
+
+    markBootStage('characterReady', 'fallback-capsule');
   }
 }
 
@@ -690,6 +735,8 @@ async function createLandmarks() {
     mesh.name = landmark.id;
     scene.add(mesh);
   });
+
+  markBootStage('landmarksReady', `sceneChildren=${scene.children.length}`);
 }
 
 async function createSetDressing() {
@@ -809,6 +856,8 @@ async function createSetDressing() {
       placeFallback({ ...anchor, scale: anchor.scale * 0.7 });
     });
   }
+
+  markBootStage('setDressingReady', `sceneChildren=${scene.children.length}`);
 }
 
 function createInteractable() {
@@ -1007,6 +1056,12 @@ function render() {
   updateChunkHud();
   controls.update();
   renderer.render(scene, camera);
+
+  if (!bootStages.firstFrameRendered) {
+    markBootStage('firstFrameRendered', `children=${scene.children.length}`);
+    hideBootLoadingOverlay('first-frame');
+  }
+
   requestAnimationFrame(render);
 }
 
@@ -1021,17 +1076,18 @@ window.addEventListener('resize', () => {
 
   try {
     createInteractable();
-    console.log('[boot-debug] scene core ready, starting render loop');
+    markBootStage('coreUiReady', 'HUD + interactable created');
+
+    setBootLoadingStatus('Loading player rig…');
+    await loadCharacterAndAnimations();
+
+    console.log('[boot-debug] character ready, starting render loop');
     render();
-    hideBootLoadingOverlay('scene-ready');
+    markBootStage('renderStarted');
 
-    const stageTasks = [
-      loadCharacterAndAnimations(),
-      createSetDressing(),
-      createLandmarks()
-    ];
-
-    const stageNames = ['loadCharacterAndAnimations', 'createSetDressing', 'createLandmarks'];
+    setBootLoadingStatus('Loading world dressing…');
+    const stageTasks = [createSetDressing(), createLandmarks()];
+    const stageNames = ['createSetDressing', 'createLandmarks'];
     const stageResults = await Promise.allSettled(stageTasks);
 
     stageResults.forEach((result, index) => {
@@ -1044,7 +1100,7 @@ window.addEventListener('resize', () => {
     });
 
     const elapsed = Math.round(performance.now() - bootStartedAt);
-    console.log(`[boot-debug] boot sequence settled in ${elapsed}ms`);
+    console.log(`[boot-debug] boot sequence settled in ${elapsed}ms | stages=${JSON.stringify(bootStages)}`);
   } catch (error) {
     console.error('[boot] failed to initialize world core:', error);
     hideBootLoadingOverlay('error');
