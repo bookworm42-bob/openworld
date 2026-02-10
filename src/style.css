@@ -1,5 +1,5 @@
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -13,7 +13,7 @@ body,
 
 body {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: linear-gradient(180deg, #1d2033 0%, #3a3f63 42%, #7f5a73 78%, #e39a6f 100%);
+  background: linear-gradient(180deg, #cde8ff 0%, #e9f5ff 62%, #f8fbff 100%);
 }
 
 canvas {

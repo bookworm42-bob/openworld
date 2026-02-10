@@ -10,9 +10,9 @@ Open-world Three.js prototype with FBX character animation blending.
   - `3d_models/boy/Walking.fbx`
   - `3d_models/boy/Jumping.fbx`
 - Controls:
-  - `ArrowUp` = move forward
-  - `ArrowLeft` / `ArrowRight` = strafe
-  - `Space` = jump
+  - `ArrowUp` or `W` = move forward
+  - `ArrowLeft` / `ArrowRight` or `A` / `D` = turn
+  - `Space` or `Shift` = jump
   - `E` = interact
   - `T` = toggle slow mode
 

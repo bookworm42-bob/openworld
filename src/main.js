@@ -2,17 +2,17 @@ import './style.css';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import idleFbxUrl from '../3d_models/boy/SadIdle.fbx?url';
 import walkFbxUrl from '../3d_models/boy/Walking.fbx?url';
 import jumpFbxUrl from '../3d_models/boy/Jumping.fbx?url';
 
 const app = document.getElementById('app');
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 app.appendChild(renderer.domElement);
 
 renderer.domElement.addEventListener('webglcontextlost', (event) => {
@@ -41,37 +41,66 @@ renderer.domElement.addEventListener('webglcontextrestored', () => {
   };
 });
 
-const TWILIGHT5 = {
-  blush: 0xfbbbad,
-  rose: 0xee8695,
-  slateBlue: 0x4a7a96,
-  deepIndigo: 0x333f58,
-  night: 0x292831
+const DAYLIGHT5 = {
+  sunWarm: 0xfff1cc,
+  skyBlue: 0x87bff5,
+  skyHaze: 0xcfe4ff,
+  meadow: 0x6f8f63,
+  meadowShade: 0x4e6a4a,
+  stone: 0x8f9d8e,
+  clay: 0xc68864
 };
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(TWILIGHT5.night);
-scene.fog = new THREE.Fog(TWILIGHT5.deepIndigo, 24, 106);
+scene.background = new THREE.Color(0xb7ddff);
+scene.fog = new THREE.Fog(0xe7f3ff, 75, 320);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
 camera.position.set(0, 4, 9);
+const cameraLookTarget = new THREE.Vector3(0, 1.2, 0);
+const cameraFollowOffset = new THREE.Vector3();
+const cameraFollowDesiredPos = new THREE.Vector3();
+const cameraFollowDesiredLook = new THREE.Vector3();
+const playerForward = new THREE.Vector3();
+const playerMoveDirection = new THREE.Vector3();
+const playerTargetQuat = new THREE.Quaternion();
+const playerFacingBasis = new THREE.Matrix4();
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const ORIGIN = new THREE.Vector3(0, 0, 0);
+const playerTurnQuat = new THREE.Quaternion();
+const lastMoveHeading = new THREE.Vector3(0, 0, -1);
+let cameraFollowInitialized = false;
+const PLAYER_TURN_SPEED = 1.8;
+const PLAYER_VISUAL_YAW_OFFSET = Math.PI;
+const PLAYER_FACING_OFFSET_QUAT = new THREE.Quaternion().setFromAxisAngle(WORLD_UP, PLAYER_VISUAL_YAW_OFFSET);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.target.set(0, 1.25, 0);
-controls.maxPolarAngle = Math.PI * 0.48;
-controls.minDistance = 3;
-controls.maxDistance = 18;
+const CAMERA_FOLLOW = {
+  distance: 6.4,
+  height: 2.8,
+  lookHeight: 1.35,
+  positionSharpness: 7.2,
+  lookSharpness: 10.0
+};
 
-scene.add(new THREE.HemisphereLight(TWILIGHT5.slateBlue, TWILIGHT5.night, 0.92));
-const dirLight = new THREE.DirectionalLight(TWILIGHT5.blush, 1.08);
-dirLight.position.set(8, 16, 6);
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.7;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+scene.add(new THREE.HemisphereLight(0xf0f8ff, 0xa4c189, 1.6));
+const dirLight = new THREE.DirectionalLight(0xfff6dd, 2.9);
+dirLight.position.set(14, 22, 10);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.normalBias = 0.02;
+dirLight.shadow.bias = -0.00005;
 scene.add(dirLight);
 
-// Soft player-focused fill/rim helper to keep silhouette readable against dusk fog.
-const playerRimLight = new THREE.DirectionalLight(TWILIGHT5.rose, 0.34);
+const fillLight = new THREE.DirectionalLight(0xf5faff, 1.1);
+fillLight.position.set(-13, 14, -12);
+scene.add(fillLight);
+
+// Soft player-focused fill/rim helper to keep silhouette readable while moving.
+const playerRimLight = new THREE.DirectionalLight(0xffe2be, 0.35);
 playerRimLight.position.set(-5, 4, -6);
 scene.add(playerRimLight);
 scene.add(playerRimLight.target);
@@ -118,15 +147,15 @@ function createGroundTexturePalette({ baseHex, accentHex, grainHex, seed = 1 }) 
 
 const stylizedGroundTextures = {
   grass: createGroundTexturePalette({
-    baseHex: 0x3d5f6a,
-    accentHex: 0x5f8b8a,
-    grainHex: 0x2e3d4e,
+    baseHex: 0x78ae62,
+    accentHex: 0xa4d685,
+    grainHex: 0x608f50,
     seed: 2.2
   }),
   dirt: createGroundTexturePalette({
-    baseHex: 0x4a3f45,
-    accentHex: 0x6b5457,
-    grainHex: 0x332b31,
+    baseHex: 0x987753,
+    accentHex: 0xc19768,
+    grainHex: 0x7b5f42,
     seed: 5.6
   })
 };
@@ -174,7 +203,7 @@ function applyDistanceGroundBlend(material) {
       vec3 grassTex = texture2D(uGroundGrassMap, terrainUv).rgb;
       vec3 dirtTex = texture2D(uGroundDirtMap, terrainUv * 0.75 + vec2(0.12, -0.08)).rgb;
       float distFade = smoothstep(uGroundBlendNear, uGroundBlendFar, distance(vGroundWorldPos.xz, uGroundCameraPos.xz));
-      vec3 distanceTint = mix(vec3(1.04, 1.02, 1.0), vec3(0.86, 0.82, 0.88), distFade);
+      vec3 distanceTint = mix(vec3(1.16, 1.14, 1.08), vec3(1.02, 1.03, 1.05), distFade);
       vec3 groundTex = mix(grassTex, dirtTex, distFade);
       gl_FragColor.rgb *= groundTex * distanceTint * 1.18;
       #include <dithering_fragment>
@@ -195,8 +224,8 @@ function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments
 
   const positions = terrainGeometry.attributes.position;
   const colors = [];
-  const lowColor = new THREE.Color(TWILIGHT5.deepIndigo);
-  const highColor = new THREE.Color(TWILIGHT5.slateBlue);
+  const lowColor = new THREE.Color(0x6c915c);
+  const highColor = new THREE.Color(0x89b872);
   const tint = new THREE.Color();
 
   for (let i = 0; i < positions.count; i += 1) {
@@ -235,7 +264,7 @@ function buildTerrainChunk(centerX, centerZ, size = TERRAIN_CHUNK_SIZE, segments
   const contourOverlay = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size, 16, 16),
     new THREE.MeshBasicMaterial({
-      color: TWILIGHT5.rose,
+      color: DAYLIGHT5.clay,
       wireframe: true,
       transparent: true,
       opacity: 0.07
@@ -382,9 +411,14 @@ let slowMode = timeScale !== DEFAULT_TIME_SCALE;
 
 const keys = {
   ArrowUp: false,
+  KeyW: false,
   ArrowLeft: false,
+  KeyA: false,
   ArrowRight: false,
+  KeyD: false,
   Space: false,
+  ShiftLeft: false,
+  ShiftRight: false,
   KeyE: false,
   KeyT: false
 };
@@ -465,6 +499,53 @@ function getTerrainHeightAt(x, z) {
   const rolling = Math.sin(x * 0.07) * Math.cos(z * 0.05) * 0.12;
   const patchNoise = Math.sin((x + z) * 0.18) * 0.04;
   return rolling + patchNoise;
+}
+
+function snapPlayerFacingToHeading(heading) {
+  if (!player || heading.lengthSq() < 0.0001) return;
+
+  playerFacingBasis.lookAt(ORIGIN, heading, WORLD_UP);
+  playerTargetQuat.setFromRotationMatrix(playerFacingBasis);
+  playerTargetQuat.multiply(PLAYER_FACING_OFFSET_QUAT);
+  player.quaternion.copy(playerTargetQuat);
+}
+
+function updateFollowCamera(delta, forceSnap = false) {
+  if (!player) return;
+
+  if (lastMoveHeading.lengthSq() > 0.0001) {
+    playerForward.copy(lastMoveHeading).normalize();
+  } else {
+    playerForward.set(0, 0, -1).applyQuaternion(player.quaternion);
+    playerForward.y = 0;
+    if (playerForward.lengthSq() < 0.0001) {
+      playerForward.set(0, 0, -1);
+    } else {
+      playerForward.normalize();
+    }
+  }
+
+  cameraFollowOffset.copy(playerForward).multiplyScalar(-CAMERA_FOLLOW.distance);
+  cameraFollowOffset.y = CAMERA_FOLLOW.height;
+
+  cameraFollowDesiredPos.copy(player.position).add(cameraFollowOffset);
+  cameraFollowDesiredLook.copy(player.position);
+  cameraFollowDesiredLook.y += CAMERA_FOLLOW.lookHeight;
+
+  if (forceSnap || !cameraFollowInitialized) {
+    camera.position.copy(cameraFollowDesiredPos);
+    cameraLookTarget.copy(cameraFollowDesiredLook);
+    camera.lookAt(cameraLookTarget);
+    cameraFollowInitialized = true;
+    return;
+  }
+
+  const posLerp = 1 - Math.exp(-CAMERA_FOLLOW.positionSharpness * delta);
+  const lookLerp = 1 - Math.exp(-CAMERA_FOLLOW.lookSharpness * delta);
+
+  camera.position.lerp(cameraFollowDesiredPos, posLerp);
+  cameraLookTarget.lerp(cameraFollowDesiredLook, lookLerp);
+  camera.lookAt(cameraLookTarget);
 }
 
 function updatePlayerRimLight() {
@@ -585,6 +666,32 @@ function inferAnimationClip(object3d) {
   return found;
 }
 
+function createInPlaceClip(clip, label = 'clip') {
+  if (!clip) return clip;
+
+  const POSITION_SUFFIX = '.position';
+  const ROOT_NODE_PATTERN = /(hips|pelvis|root|armature|rootnode|mixamorig)/i;
+  let removedTracks = 0;
+
+  const keptTracks = clip.tracks.filter((track) => {
+    if (!track.name.endsWith(POSITION_SUFFIX)) return true;
+    const nodePath = track.name.slice(0, -POSITION_SUFFIX.length);
+    const isRootPositionTrack = ROOT_NODE_PATTERN.test(nodePath);
+    if (isRootPositionTrack) removedTracks += 1;
+    return !isRootPositionTrack;
+  });
+
+  if (removedTracks === 0) return clip;
+
+  const inPlaceClip = clip.clone();
+  inPlaceClip.tracks = keptTracks.map((track) => track.clone());
+  inPlaceClip.resetDuration();
+  inPlaceClip.name = `${clip.name || label}-in-place`;
+
+  console.log(`[boot-debug] createInPlaceClip(${label}): removed ${removedTracks} root-position tracks`);
+  return inPlaceClip;
+}
+
 async function loadFBX(path) {
   const startedAt = performance.now();
   loadDebugState.fbxInFlight += 1;
@@ -652,7 +759,7 @@ function applyWarmRimAccent(material) {
   patched.userData = { ...patched.userData, rimAccentApplied: true };
 
   patched.onBeforeCompile = (shader) => {
-    shader.uniforms.rimColor = { value: new THREE.Color(TWILIGHT5.blush) };
+    shader.uniforms.rimColor = { value: new THREE.Color(0xffd8a8) };
     shader.uniforms.rimStrength = { value: 0.16 };
 
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -697,12 +804,13 @@ async function loadCharacterAndAnimations() {
 
     player = loadedPlayer;
     scene.add(player);
+    snapPlayerFacingToHeading(lastMoveHeading);
 
     console.log(`[boot-debug] player normalized | pos=${formatVec3Debug(player.position)} scale=${formatVec3Debug(player.scale)}`);
 
     mixer = new THREE.AnimationMixer(player);
 
-    const idleClip = inferAnimationClip(player);
+    const idleClip = createInPlaceClip(inferAnimationClip(player), 'idle');
     if (!idleClip) {
       throw new Error('Idle animation clip missing from player FBX.');
     }
@@ -713,14 +821,14 @@ async function loadCharacterAndAnimations() {
 
     // Optional movement clips are loaded later after world staging settles.
 
-    // Reframe camera once character bounds are known.
+    // Snap follow camera once character bounds are known.
     const box = new THREE.Box3().setFromObject(player);
     const center = new THREE.Vector3();
     if (!box.isEmpty()) {
       box.getCenter(center);
       if (Number.isFinite(center.x) && Number.isFinite(center.y) && Number.isFinite(center.z)) {
-        controls.target.copy(center);
-        camera.position.set(center.x + 3.2, center.y + 2.2, center.z + 5.8);
+        cameraFollowInitialized = false;
+        updateFollowCamera(0, true);
       } else {
         console.warn('[boot-debug] camera reframe skipped due to non-finite center', center);
       }
@@ -748,6 +856,7 @@ async function loadCharacterAndAnimations() {
     player.position.set(0, 1, 0);
     player.castShadow = true;
     scene.add(player);
+    snapPlayerFacingToHeading(lastMoveHeading);
 
     markBootStage('characterReady', 'fallback-capsule');
   }
@@ -764,8 +873,8 @@ async function loadDeferredMovementAnimations() {
 
   try {
     const [walkFbx, jumpFbx] = await Promise.all([loadFBX(animPaths.walk), loadFBX(animPaths.jump)]);
-    const walkClip = inferAnimationClip(walkFbx);
-    const jumpClip = inferAnimationClip(jumpFbx);
+    const walkClip = createInPlaceClip(inferAnimationClip(walkFbx), 'walk');
+    const jumpClip = createInPlaceClip(inferAnimationClip(jumpFbx), 'jump');
 
     if (!walkClip || !jumpClip) {
       console.warn('[boot-debug] walk/jump clips missing; movement animation disabled');
@@ -898,8 +1007,8 @@ async function loadLandmarkAssets() {
 
 async function createLandmarks() {
   console.log('[boot-debug] createLandmarks: start');
-  const stoneMaterial = applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: TWILIGHT5.slateBlue, roughness: 0.91, metalness: 0.03 }));
-  const accentMaterial = applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: TWILIGHT5.rose, roughness: 0.74, metalness: 0.08 }));
+  const stoneMaterial = applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: DAYLIGHT5.stone, roughness: 0.91, metalness: 0.03 }));
+  const accentMaterial = applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: DAYLIGHT5.clay, roughness: 0.74, metalness: 0.08 }));
   const materials = { stone: stoneMaterial, accent: accentMaterial };
   const landmarkAssets = await loadLandmarkAssets();
 
@@ -1177,9 +1286,10 @@ function updateChunkHud() {
 function onKey(isDown, e) {
   if (!(e.code in keys)) return;
   keys[e.code] = isDown;
-  if (e.code === 'Space') e.preventDefault();
+  if (e.code === 'Space' || e.code === 'ArrowUp') e.preventDefault();
 
-  if (isDown && e.code === 'Space' && player && !jumping) {
+  const jumpPressed = e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight';
+  if (isDown && jumpPressed && player && !jumping) {
     jumping = true;
     velocityY = jumpVelocity;
     if (actions.jump) setAction('jump', 0.08);
@@ -1205,22 +1315,25 @@ function updatePlayer(delta) {
 
   const moveSpeed = 4.4;
 
-  const moveVec = new THREE.Vector3();
-  if (keys.ArrowUp) moveVec.z -= 1;
-  if (keys.ArrowLeft) moveVec.x -= 1;
-  if (keys.ArrowRight) moveVec.x += 1;
+  const turnInput = ((keys.ArrowRight || keys.KeyD) ? 1 : 0) - ((keys.ArrowLeft || keys.KeyA) ? 1 : 0);
+  const movingForward = keys.ArrowUp || keys.KeyW;
 
-  if (moveVec.lengthSq() > 0) {
-    moveVec.normalize().multiplyScalar(moveSpeed * delta);
-    player.position.add(moveVec);
+  if (turnInput !== 0) {
+    // Tank-style steering: rotate heading at a capped yaw speed.
+    playerTurnQuat.setFromAxisAngle(WORLD_UP, -turnInput * PLAYER_TURN_SPEED * delta);
+    lastMoveHeading.applyQuaternion(playerTurnQuat).normalize();
+  }
+
+  playerMoveDirection.set(0, 0, 0);
+  if (movingForward) {
+    playerMoveDirection.copy(lastMoveHeading);
+    player.position.addScaledVector(playerMoveDirection, moveSpeed * delta);
 
     if (actions.walk && !jumping) setAction('walk', 0.16);
-
-    const lookTarget = player.position.clone().add(new THREE.Vector3(moveVec.x, 0, moveVec.z));
-    player.lookAt(lookTarget);
   } else if (actions.idle && !jumping) {
     setAction('idle', 0.2);
   }
+  snapPlayerFacingToHeading(lastMoveHeading);
 
   const terrainY = getTerrainHeightAt(player.position.x, player.position.z);
 
@@ -1234,17 +1347,13 @@ function updatePlayer(delta) {
       jumping = false;
       groundedY = terrainY;
 
-      if (moveVec.lengthSq() > 0 && actions.walk) setAction('walk', 0.14);
+      if (movingForward && actions.walk) setAction('walk', 0.14);
       else if (actions.idle) setAction('idle', 0.14);
     }
   } else {
     groundedY = terrainY;
     player.position.y = groundedY;
   }
-
-  // soft camera follow
-  const desiredTarget = player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-  controls.target.lerp(desiredTarget, 1 - Math.pow(0.001, delta));
 
   if (interactable.mesh) {
     const distance = player.position.distanceTo(interactable.mesh.position);
@@ -1269,26 +1378,26 @@ function render() {
     const scaledDelta = delta * timeScale;
     if (mixer) mixer.update(scaledDelta);
     updatePlayer(scaledDelta);
+    updateFollowCamera(scaledDelta);
     updatePlayerRimLight();
     updateTerrainChunkVisibility();
     terrainBlendMaterials.forEach((material) => {
       material.userData?.groundBlendShader?.uniforms?.uGroundCameraPos?.value.copy(camera.position);
     });
     updateChunkHud();
-    controls.update();
     renderer.render(scene, camera);
 
     if (!bootStages.firstFrameRendered) {
       markBootStage(
         'firstFrameRendered',
-        `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
+        `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(cameraLookTarget)} player=${formatVec3Debug(player?.position)}`
       );
     }
 
     if (bootStages.characterReady && !bootStages.firstFrameWithCharacterRendered) {
       markBootStage(
         'firstFrameWithCharacterRendered',
-        `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
+        `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(cameraLookTarget)} player=${formatVec3Debug(player?.position)}`
       );
 
       if (!bootStages.setDressingReady || !bootStages.landmarksReady) {
@@ -1322,7 +1431,7 @@ function ensureRenderLoopStarted(reason = 'unknown') {
   renderLoopStarted = true;
   console.log(`[boot-debug] starting render loop (${reason})`);
   render();
-  markBootStage('renderStarted', `${reason} | camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`);
+  markBootStage('renderStarted', `${reason} | camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(cameraLookTarget)} player=${formatVec3Debug(player?.position)}`);
 }
 
 window.addEventListener('resize', () => {
