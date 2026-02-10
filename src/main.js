@@ -1341,49 +1341,35 @@ window.addEventListener('resize', () => {
     // Start rendering immediately so world/terrain still appears even if character load is slow.
     ensureRenderLoopStarted('post-core-ui');
 
-    console.log('[boot-debug] init chain: load character + world in parallel, keep world stages sequential, then deferred movement clips');
+    console.log('[boot-debug] init chain: serialize character -> world staging to avoid high asset decode contention, then deferred movement clips');
 
-    setBootLoadingStatus('Loading player + world…');
+    setBootLoadingStatus('Loading player rig…');
 
-    const characterTask = (async () => {
-      const characterStartedAt = performance.now();
-      await loadCharacterAndAnimations();
-      console.log(`[boot-debug] loadCharacterAndAnimations: complete (${Math.round(performance.now() - characterStartedAt)}ms)`);
-      return { status: 'fulfilled' };
-    })().catch((error) => {
-      console.error('[boot-debug] loadCharacterAndAnimations: failed', error);
-      return { status: 'rejected', reason: error };
-    });
+    const characterStartedAt = performance.now();
+    await loadCharacterAndAnimations();
+    console.log(`[boot-debug] loadCharacterAndAnimations: complete (${Math.round(performance.now() - characterStartedAt)}ms) | inFlight now fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
-    const worldTask = (async () => {
-      const stageFactories = [
-        { name: 'createSetDressing', run: createSetDressing },
-        { name: 'createLandmarks', run: createLandmarks }
-      ];
+    setBootLoadingStatus('Loading world dressing…');
 
-      const worldResults = [];
-      for (const { name, run } of stageFactories) {
-        const startedAt = performance.now();
-        console.log(`[boot-debug] ${name}: queued (sequential)`);
-        try {
-          await run();
-          const elapsed = Math.round(performance.now() - startedAt);
-          console.log(`[boot-debug] ${name}: complete (${elapsed}ms)`);
-          worldResults.push({ name, status: 'fulfilled' });
-        } catch (error) {
-          const elapsed = Math.round(performance.now() - startedAt);
-          console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
-          worldResults.push({ name, status: 'rejected', reason: error });
-        }
+    const stageFactories = [
+      { name: 'createSetDressing', run: createSetDressing },
+      { name: 'createLandmarks', run: createLandmarks }
+    ];
+
+    const worldResults = [];
+    for (const { name, run } of stageFactories) {
+      const startedAt = performance.now();
+      console.log(`[boot-debug] ${name}: queued (sequential) | inFlight before run fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
+      try {
+        await run();
+        const elapsed = Math.round(performance.now() - startedAt);
+        console.log(`[boot-debug] ${name}: complete (${elapsed}ms) | inFlight after run fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
+        worldResults.push({ name, status: 'fulfilled' });
+      } catch (error) {
+        const elapsed = Math.round(performance.now() - startedAt);
+        console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
+        worldResults.push({ name, status: 'rejected', reason: error });
       }
-
-      return worldResults;
-    })();
-
-    const [characterResult, worldResults] = await Promise.all([characterTask, worldTask]);
-
-    if (characterResult?.status === 'rejected') {
-      console.warn('[boot-debug] character stage settled with failure (fallback should be active)');
     }
 
     const failedWorldStages = worldResults.filter((result) => result.status === 'rejected');

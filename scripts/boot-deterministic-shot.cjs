@@ -24,7 +24,8 @@ const path = require('path');
       if (m.type() === 'error') console.log('BROWSER_ERROR:', m.text());
     });
 
-    await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const targetUrl = process.env.BOOT_CHECK_URL || 'http://127.0.0.1:4173/';
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     await page.waitForFunction(() => {
       const boot = window.__BOOT_DEBUG__;
