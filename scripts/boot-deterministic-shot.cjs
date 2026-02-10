@@ -32,9 +32,11 @@ const path = require('path');
         boot.stages?.renderStarted &&
         boot.stages?.firstFrameRendered &&
         boot.stages?.characterReady &&
+        boot.stages?.setDressingReady &&
+        boot.stages?.landmarksReady &&
         overlayHidden
       );
-    }, { timeout: 45000 });
+    }, null, { timeout: 90000 });
 
     const debug = await page.evaluate(() => ({
       boot: window.__BOOT_DEBUG__ || null,

@@ -325,12 +325,10 @@ function hideBootLoadingOverlay(mode = 'complete') {
 function maybeHideBootOverlayAfterFirstRenderableFrame() {
   const worldReady = bootStages.setDressingReady && bootStages.landmarksReady;
   const canHideAfterWorldFrame = worldReady && bootStages.firstFrameRendered;
-  const canHideAfterCharacterFrame = bootStages.characterReady && bootStages.firstFrameWithCharacterRendered;
 
-  if (!canHideAfterWorldFrame && !canHideAfterCharacterFrame) return;
+  if (!canHideAfterWorldFrame) return;
 
-  const mode = canHideAfterCharacterFrame ? 'character-first-frame' : 'world-first-frame';
-  hideBootLoadingOverlay(mode);
+  hideBootLoadingOverlay('world-first-frame');
 }
 
 createBootLoadingOverlay();
@@ -1245,6 +1243,12 @@ function render() {
       'firstFrameWithCharacterRendered',
       `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
     );
+
+    if (!bootStages.setDressingReady || !bootStages.landmarksReady) {
+      console.log(
+        `[boot-debug] character frame rendered before world dressing settled | setDressingReady=${bootStages.setDressingReady} landmarksReady=${bootStages.landmarksReady}`
+      );
+    }
   }
 
   maybeHideBootOverlayAfterFirstRenderableFrame();
