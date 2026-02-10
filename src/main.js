@@ -364,7 +364,6 @@ assetLoadingManager.onError = (url) => {
 };
 
 const loader = new FBXLoader(assetLoadingManager);
-const gltfLoader = new GLTFLoader(assetLoadingManager);
 const clock = new THREE.Clock();
 
 const loadDebugState = {
@@ -622,26 +621,30 @@ async function loadFBX(path) {
   }
 }
 
+let gltfRequestCounter = 0;
+
 async function loadGLTF(path) {
   const startedAt = performance.now();
+  const requestId = ++gltfRequestCounter;
+  const localLoader = new GLTFLoader(assetLoadingManager);
   loadDebugState.gltfInFlight += 1;
   loadDebugState.peakGltfInFlight = Math.max(loadDebugState.peakGltfInFlight, loadDebugState.gltfInFlight);
-  console.log(`[boot-debug] GLTF load start: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
+  console.log(`[boot-debug] GLTF#${requestId} load start: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
   try {
     const result = await new Promise((resolve, reject) => {
-      gltfLoader.load(path, resolve, undefined, reject);
+      localLoader.load(path, resolve, undefined, reject);
     });
     const elapsed = Math.round(performance.now() - startedAt);
-    console.log(`[boot-debug] GLTF load done: ${path} (${elapsed}ms)`);
+    console.log(`[boot-debug] GLTF#${requestId} load done: ${path} (${elapsed}ms)`);
     return result;
   } catch (error) {
     const elapsed = Math.round(performance.now() - startedAt);
-    console.error(`[boot-debug] GLTF load failed: ${path} (${elapsed}ms)`, error);
+    console.error(`[boot-debug] GLTF#${requestId} load failed: ${path} (${elapsed}ms)`, error);
     throw error;
   } finally {
     loadDebugState.gltfInFlight = Math.max(0, loadDebugState.gltfInFlight - 1);
-    console.log(`[boot-debug] GLTF load settled: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
+    console.log(`[boot-debug] GLTF#${requestId} load settled: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
   }
 }
 
