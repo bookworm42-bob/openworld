@@ -675,24 +675,28 @@ function applyWarmRimAccent(material) {
 }
 
 async function loadCharacterAndAnimations() {
+  let loadedPlayer = null;
+
   try {
     console.log('[boot-debug] loadCharacterAndAnimations: start');
     // Load character once.
-    player = await loadFBX(playerPath);
+    loadedPlayer = await loadFBX(playerPath);
     console.log('[boot-debug] player FBX loaded');
-    player.position.set(0, 0, 0);
-    player.traverse((child) => {
+    loadedPlayer.position.set(0, 0, 0);
+    loadedPlayer.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
       }
     });
 
-    scene.add(player);
-    const normalizedOk = normalizePlayerScaleAndGround(player);
+    const normalizedOk = normalizePlayerScaleAndGround(loadedPlayer);
     if (!normalizedOk) {
       throw new Error('Player bounds invalid after FBX load; aborting rig setup for safe fallback.');
     }
+
+    player = loadedPlayer;
+    scene.add(player);
 
     console.log(`[boot-debug] player normalized | pos=${formatVec3Debug(player.position)} scale=${formatVec3Debug(player.scale)}`);
 
@@ -727,6 +731,14 @@ async function loadCharacterAndAnimations() {
     markBootStage('characterReady', `sceneChildren=${scene.children.length}`);
   } catch (error) {
     console.error('Failed to load model/animations from ./3d_models/boy:', error);
+
+    if (loadedPlayer?.parent) {
+      loadedPlayer.parent.remove(loadedPlayer);
+      console.warn('[boot-debug] removed invalid player rig from scene before fallback');
+    }
+
+    player = null;
+    mixer = null;
 
     // Visual fallback so the scene still works while assets are being added.
     player = new THREE.Mesh(
@@ -1249,42 +1261,54 @@ function updatePlayer(delta) {
 }
 
 let renderLoopStarted = false;
+let renderExceptionCount = 0;
 
 function render() {
-  const delta = clock.getDelta();
-  const scaledDelta = delta * timeScale;
-  if (mixer) mixer.update(scaledDelta);
-  updatePlayer(scaledDelta);
-  updatePlayerRimLight();
-  updateTerrainChunkVisibility();
-  terrainBlendMaterials.forEach((material) => {
-    material.userData?.groundBlendShader?.uniforms?.uGroundCameraPos?.value.copy(camera.position);
-  });
-  updateChunkHud();
-  controls.update();
-  renderer.render(scene, camera);
+  try {
+    const delta = clock.getDelta();
+    const scaledDelta = delta * timeScale;
+    if (mixer) mixer.update(scaledDelta);
+    updatePlayer(scaledDelta);
+    updatePlayerRimLight();
+    updateTerrainChunkVisibility();
+    terrainBlendMaterials.forEach((material) => {
+      material.userData?.groundBlendShader?.uniforms?.uGroundCameraPos?.value.copy(camera.position);
+    });
+    updateChunkHud();
+    controls.update();
+    renderer.render(scene, camera);
 
-  if (!bootStages.firstFrameRendered) {
-    markBootStage(
-      'firstFrameRendered',
-      `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
-    );
-  }
-
-  if (bootStages.characterReady && !bootStages.firstFrameWithCharacterRendered) {
-    markBootStage(
-      'firstFrameWithCharacterRendered',
-      `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
-    );
-
-    if (!bootStages.setDressingReady || !bootStages.landmarksReady) {
-      console.log(
-        `[boot-debug] character frame rendered before world dressing settled | setDressingReady=${bootStages.setDressingReady} landmarksReady=${bootStages.landmarksReady}`
+    if (!bootStages.firstFrameRendered) {
+      markBootStage(
+        'firstFrameRendered',
+        `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
       );
     }
-  }
 
-  maybeHideBootOverlayAfterFirstRenderableFrame();
+    if (bootStages.characterReady && !bootStages.firstFrameWithCharacterRendered) {
+      markBootStage(
+        'firstFrameWithCharacterRendered',
+        `children=${scene.children.length} camera=${formatVec3Debug(camera.position)} target=${formatVec3Debug(controls.target)} player=${formatVec3Debug(player?.position)}`
+      );
+
+      if (!bootStages.setDressingReady || !bootStages.landmarksReady) {
+        console.log(
+          `[boot-debug] character frame rendered before world dressing settled | setDressingReady=${bootStages.setDressingReady} landmarksReady=${bootStages.landmarksReady}`
+        );
+      }
+    }
+
+    maybeHideBootOverlayAfterFirstRenderableFrame();
+  } catch (error) {
+    renderExceptionCount += 1;
+    console.error('[boot-debug] render frame exception', {
+      count: renderExceptionCount,
+      error,
+      player: formatVec3Debug(player?.position),
+      camera: formatVec3Debug(camera?.position),
+      stages: { ...bootStages }
+    });
+  }
 
   requestAnimationFrame(render);
 }
