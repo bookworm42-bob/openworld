@@ -15,6 +15,25 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 app.appendChild(renderer.domElement);
 
+renderer.domElement.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  console.error('[boot-debug] WebGL context lost during boot/runtime');
+  window.__BOOT_DEBUG__ = {
+    ...(window.__BOOT_DEBUG__ || {}),
+    contextLost: true,
+    contextLostAtMs: Math.round(performance.now())
+  };
+});
+
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  console.warn('[boot-debug] WebGL context restored');
+  window.__BOOT_DEBUG__ = {
+    ...(window.__BOOT_DEBUG__ || {}),
+    contextLost: false,
+    contextRestoredAtMs: Math.round(performance.now())
+  };
+});
+
 const TWILIGHT5 = {
   blush: 0xfbbbad,
   rose: 0xee8695,
@@ -332,7 +351,9 @@ const clock = new THREE.Clock();
 
 const loadDebugState = {
   fbxInFlight: 0,
-  gltfInFlight: 0
+  gltfInFlight: 0,
+  peakFbxInFlight: 0,
+  peakGltfInFlight: 0
 };
 
 const DEFAULT_TIME_SCALE = 1;
@@ -530,6 +551,7 @@ function inferAnimationClip(object3d) {
 async function loadFBX(path) {
   const startedAt = performance.now();
   loadDebugState.fbxInFlight += 1;
+  loadDebugState.peakFbxInFlight = Math.max(loadDebugState.peakFbxInFlight, loadDebugState.fbxInFlight);
   console.log(`[boot-debug] FBX load start: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
   try {
@@ -566,6 +588,7 @@ async function loadFBX(path) {
 async function loadGLTF(path) {
   const startedAt = performance.now();
   loadDebugState.gltfInFlight += 1;
+  loadDebugState.peakGltfInFlight = Math.max(loadDebugState.peakGltfInFlight, loadDebugState.gltfInFlight);
   console.log(`[boot-debug] GLTF load start: ${path} | inFlight fbx=${loadDebugState.fbxInFlight} gltf=${loadDebugState.gltfInFlight}`);
 
   try {
@@ -1235,23 +1258,22 @@ window.addEventListener('resize', () => {
       { name: 'createLandmarks', run: createLandmarks }
     ];
 
-    const stageTasks = stageFactories.map(({ name, run }) => {
+    const worldResults = [];
+    for (const { name, run } of stageFactories) {
       const startedAt = performance.now();
-      console.log(`[boot-debug] ${name}: queued`);
-      return run()
-        .then(() => {
-          const elapsed = Math.round(performance.now() - startedAt);
-          console.log(`[boot-debug] ${name}: complete (${elapsed}ms)`);
-          return { name, status: 'fulfilled' };
-        })
-        .catch((error) => {
-          const elapsed = Math.round(performance.now() - startedAt);
-          console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
-          return { name, status: 'rejected', reason: error };
-        });
-    });
+      console.log(`[boot-debug] ${name}: queued (sequential)`);
+      try {
+        await run();
+        const elapsed = Math.round(performance.now() - startedAt);
+        console.log(`[boot-debug] ${name}: complete (${elapsed}ms)`);
+        worldResults.push({ name, status: 'fulfilled' });
+      } catch (error) {
+        const elapsed = Math.round(performance.now() - startedAt);
+        console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
+        worldResults.push({ name, status: 'rejected', reason: error });
+      }
+    }
 
-    const worldResults = await Promise.all(stageTasks);
     const failedWorldStages = worldResults.filter((result) => result.status === 'rejected');
     if (failedWorldStages.length > 0) {
       console.warn('[boot-debug] world stages settled with failures', failedWorldStages.map((result) => result.name));
@@ -1261,7 +1283,16 @@ window.addEventListener('resize', () => {
     await loadDeferredMovementAnimations();
 
     const elapsed = Math.round(performance.now() - bootStartedAt);
-    console.log(`[boot-debug] boot sequence settled in ${elapsed}ms | stages=${JSON.stringify(bootStages)}`);
+    console.log(
+      `[boot-debug] boot sequence settled in ${elapsed}ms | stages=${JSON.stringify(bootStages)} | peakInFlight fbx=${loadDebugState.peakFbxInFlight} gltf=${loadDebugState.peakGltfInFlight}`
+    );
+    window.__BOOT_DEBUG__ = {
+      ...(window.__BOOT_DEBUG__ || {}),
+      peakInFlight: {
+        fbx: loadDebugState.peakFbxInFlight,
+        gltf: loadDebugState.peakGltfInFlight
+      }
+    };
   } catch (error) {
     console.error('[boot] failed to initialize world core:', error);
     hideBootLoadingOverlay('error');
