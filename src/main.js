@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import idleFbxUrl from '../3d_models/boy/Sad Idle.fbx?url';
+import idleFbxUrl from '../3d_models/boy/SadIdle.fbx?url';
 import walkFbxUrl from '../3d_models/boy/Walking.fbx?url';
 import jumpFbxUrl from '../3d_models/boy/Jumping.fbx?url';
 
@@ -342,9 +342,16 @@ setTimeout(() => {
 }, 120000);
 
 const assetLoadingManager = new THREE.LoadingManager();
-assetLoadingManager.onStart = () => setBootLoadingStatus('Loading world assets…');
-assetLoadingManager.onProgress = (_url, loaded, total) => {
+assetLoadingManager.onStart = (url, loaded, total) => {
+  console.log(`[boot-debug] asset manager start: ${url || 'n/a'} (${loaded}/${total})`);
+  setBootLoadingStatus('Loading world assets…');
+};
+assetLoadingManager.onProgress = (url, loaded, total) => {
   if (total > 0) setBootLoadingStatus(`Loading world assets… (${loaded}/${total})`);
+  console.log(`[boot-debug] asset manager progress: ${url || 'n/a'} (${loaded}/${total})`);
+};
+assetLoadingManager.onLoad = () => {
+  console.log('[boot-debug] asset manager load complete (all pending assets settled)');
 };
 assetLoadingManager.onError = (url) => {
   console.error('[boot] asset load error:', url);
@@ -1284,35 +1291,49 @@ window.addEventListener('resize', () => {
     // Start rendering immediately so world/terrain still appears even if character load is slow.
     ensureRenderLoopStarted('post-core-ui');
 
-    console.log('[boot-debug] init chain: load character first, then world dressing, then deferred movement clips');
+    console.log('[boot-debug] init chain: load character + world in parallel, keep world stages sequential, then deferred movement clips');
 
-    setBootLoadingStatus('Loading player rig…');
+    setBootLoadingStatus('Loading player + world…');
 
-    const characterStartedAt = performance.now();
-    await loadCharacterAndAnimations();
-    console.log(`[boot-debug] loadCharacterAndAnimations: complete (${Math.round(performance.now() - characterStartedAt)}ms)`);
+    const characterTask = (async () => {
+      const characterStartedAt = performance.now();
+      await loadCharacterAndAnimations();
+      console.log(`[boot-debug] loadCharacterAndAnimations: complete (${Math.round(performance.now() - characterStartedAt)}ms)`);
+      return { status: 'fulfilled' };
+    })().catch((error) => {
+      console.error('[boot-debug] loadCharacterAndAnimations: failed', error);
+      return { status: 'rejected', reason: error };
+    });
 
-    setBootLoadingStatus('Loading world dressing…');
+    const worldTask = (async () => {
+      const stageFactories = [
+        { name: 'createSetDressing', run: createSetDressing },
+        { name: 'createLandmarks', run: createLandmarks }
+      ];
 
-    const stageFactories = [
-      { name: 'createSetDressing', run: createSetDressing },
-      { name: 'createLandmarks', run: createLandmarks }
-    ];
-
-    const worldResults = [];
-    for (const { name, run } of stageFactories) {
-      const startedAt = performance.now();
-      console.log(`[boot-debug] ${name}: queued (sequential)`);
-      try {
-        await run();
-        const elapsed = Math.round(performance.now() - startedAt);
-        console.log(`[boot-debug] ${name}: complete (${elapsed}ms)`);
-        worldResults.push({ name, status: 'fulfilled' });
-      } catch (error) {
-        const elapsed = Math.round(performance.now() - startedAt);
-        console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
-        worldResults.push({ name, status: 'rejected', reason: error });
+      const worldResults = [];
+      for (const { name, run } of stageFactories) {
+        const startedAt = performance.now();
+        console.log(`[boot-debug] ${name}: queued (sequential)`);
+        try {
+          await run();
+          const elapsed = Math.round(performance.now() - startedAt);
+          console.log(`[boot-debug] ${name}: complete (${elapsed}ms)`);
+          worldResults.push({ name, status: 'fulfilled' });
+        } catch (error) {
+          const elapsed = Math.round(performance.now() - startedAt);
+          console.error(`[boot-debug] ${name}: failed (${elapsed}ms)`, error);
+          worldResults.push({ name, status: 'rejected', reason: error });
+        }
       }
+
+      return worldResults;
+    })();
+
+    const [characterResult, worldResults] = await Promise.all([characterTask, worldTask]);
+
+    if (characterResult?.status === 'rejected') {
+      console.warn('[boot-debug] character stage settled with failure (fallback should be active)');
     }
 
     const failedWorldStages = worldResults.filter((result) => result.status === 'rejected');
