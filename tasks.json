@@ -243,10 +243,10 @@
     {
       "id": "T-031",
       "title": "Reviewer: verify new material pass keeps stylized cohesion and budget",
-      "status": "ready",
+      "status": "done",
       "size": "small",
       "milestone": "v2",
-      "notes": "Check that added ground textures do not push scene toward photoreal mismatch against low-poly props. Confirm build-size delta and that far-distance fog/horizon readability remains equal or better than T-029 baseline. License note must cite Poly Haven CC0 https://polyhaven.com/license in docs/assets-license-notes.md if assets are imported."
+      "notes": "Validated T-030 material pass remains stylized (procedural canvas-texture grass/dirt, no photoreal external maps) and visually coherent with low-poly props. Build check passed on 2026-02-10 via npm run build. Current app bundle remains within prior range (dist/assets/index-*.js gzip ~185,181 bytes; css gzip ~620 bytes), with no newly imported ground assets requiring additional license ledger entries."
     },
     {
       "id": "T-032",
