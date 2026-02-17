@@ -11,6 +11,9 @@ let actTimer = null;
 let latestObs = null;
 let loggedSchema = false;
 let lastInteractAt = 0;
+let lastSeenPerceivedAt = Date.now();
+const NO_TARGET_RESTART_SEC = Number(process.env.NO_TARGET_RESTART_SEC || 35);
+let restarting = false;
 
 function send(obj) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -108,6 +111,18 @@ function startActLoop() {
       // Nothing perceived: keep scanning and moving.
       forward = 0.65;
       turn = 0.45 * Math.sin(t * 0.7);
+
+      const blindForMs = Date.now() - lastSeenPerceivedAt;
+      if (!restarting && blindForMs > NO_TARGET_RESTART_SEC * 1000) {
+        restarting = true;
+        console.log(`[WATCHDOG] no perceived targets for ${(blindForMs / 1000).toFixed(1)}s -> requesting game restart`);
+        if (actTimer) clearInterval(actTimer);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.close(4000, 'no targets watchdog');
+        }
+        setTimeout(() => process.exit(42), 250);
+        return;
+      }
     }
 
     send({
@@ -156,6 +171,7 @@ function connect() {
       latestObs = msg;
       const tick = msg.tick ?? msg.frame ?? '?';
       const perceivedCount = Array.isArray(msg.perceived) ? msg.perceived.length : 0;
+      if (perceivedCount > 0) lastSeenPerceivedAt = Date.now();
       const target = pickTarget(msg);
       const targetTxt = target
         ? ` | target=${target.id} tag=${target.tag ?? 'obj'} dist=${safeNum(target.dist, NaN).toFixed(2)} bearing=${safeNum(target.bearing, NaN).toFixed(3)}`
