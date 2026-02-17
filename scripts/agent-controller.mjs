@@ -14,6 +14,8 @@ let lastInteractAt = 0;
 let lastSeenPerceivedAt = Date.now();
 const NO_TARGET_RESTART_SEC = Number(process.env.NO_TARGET_RESTART_SEC || 35);
 let restarting = false;
+let roamTurnSign = 1;
+let lastRoamFlipAt = 0;
 
 function send(obj) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -108,9 +110,29 @@ function startActLoop() {
 
       maybeInteractWithTarget(target);
     } else {
-      // Nothing perceived: keep scanning and moving.
-      forward = 0.65;
-      turn = 0.45 * Math.sin(t * 0.7);
+      // Nothing perceived: roam with obstacle avoidance so we keep exploring.
+      const ray = latestObs?.sensors?.ray || {};
+      const front = safeNum(ray.front, 99);
+      const frontLeft = safeNum(ray.frontLeft, 99);
+      const frontRight = safeNum(ray.frontRight, 99);
+      const stuck = Boolean(latestObs?.sensors?.stuck);
+
+      const now = Date.now();
+      if (now - lastRoamFlipAt > 2500) {
+        lastRoamFlipAt = now;
+        roamTurnSign *= -1;
+      }
+
+      if (stuck || front < 1.2) {
+        forward = -0.25;
+        turn = frontLeft > frontRight ? -0.9 : 0.9;
+      } else if (front < 2.5) {
+        forward = 0.35;
+        turn = frontLeft > frontRight ? -0.75 : 0.75;
+      } else {
+        forward = 0.9;
+        turn = 0.45 * roamTurnSign;
+      }
 
       const blindForMs = Date.now() - lastSeenPerceivedAt;
       if (!restarting && blindForMs > NO_TARGET_RESTART_SEC * 1000) {
