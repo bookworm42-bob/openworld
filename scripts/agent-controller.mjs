@@ -6,22 +6,70 @@ const ACT_INTERVAL_MS = Math.round(1000 / ACT_HZ);
 
 let seq = 0;
 let ws;
-let lastObs = null;
 let interacted = false;
 let captureSent = false;
 let actTimer = null;
+let latestObs = null;
+let loggedSchema = false;
 
 function send(obj) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify(obj));
 }
 
+function safeNum(v, fallback = NaN) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function summarizePerceived(perceived = []) {
   if (!Array.isArray(perceived) || perceived.length === 0) return 'none';
   return perceived
     .slice(0, 5)
-    .map((p) => `${p.id ?? 'unknown'}:${p.kind ?? 'obj'}@${Number(p.distance ?? NaN).toFixed(2)}`)
+    .map((p) => {
+      const dist = safeNum(p.distance, NaN);
+      const d = Number.isFinite(dist) ? dist.toFixed(2) : '?';
+      return `${p.id ?? 'unknown'}:${p.kind ?? p.type ?? 'obj'}@${d}`;
+    })
     .join(', ');
+}
+
+function objectLooksLikeTower(p) {
+  if (!p || typeof p !== 'object') return false;
+  const hay = JSON.stringify(p).toLowerCase();
+  return (
+    hay.includes('tower') ||
+    hay.includes('big_tower') ||
+    hay.includes('watchtower') ||
+    hay.includes('monolith')
+  );
+}
+
+function bearingOf(p) {
+  // Try common fields seen in these bridge payloads.
+  const candidates = [p.bearing, p.yaw, p.relYaw, p.angle, p.azimuth, p.theta, p.dir];
+  for (const c of candidates) {
+    const n = safeNum(c, NaN);
+    if (Number.isFinite(n)) return n;
+  }
+  return NaN;
+}
+
+function pickTowerTarget(obs) {
+  const perceived = Array.isArray(obs?.perceived) ? obs.perceived : [];
+  const towers = perceived.filter(objectLooksLikeTower);
+  if (towers.length === 0) return null;
+
+  towers.sort((a, b) => {
+    const da = safeNum(a.distance, Number.POSITIVE_INFINITY);
+    const db = safeNum(b.distance, Number.POSITIVE_INFINITY);
+    return da - db;
+  });
+  return towers[0];
+}
+
+function clamp1(v) {
+  return Math.max(-1, Math.min(1, v));
 }
 
 function startActLoop() {
@@ -31,17 +79,33 @@ function startActLoop() {
   actTimer = setInterval(() => {
     const t = (Date.now() - start) / 1000;
 
-    // Simple movement pattern: move forward while weaving/turning.
-    const forward = 1.0;
-    const strafe = Math.sin(t * 0.8) * 0.5;
-    const turn = Math.sin(t * 0.6) * 0.35;
+    let forward = 0.8;
+    let strafe = 0;
+    let turn = 0.3 * Math.sin(t * 0.7); // search pattern default
+
+    const target = pickTowerTarget(latestObs);
+    if (target) {
+      const b = bearingOf(target);
+      if (Number.isFinite(b)) {
+        // Assume bearing in radians if small-ish, degrees if larger.
+        const bNorm = Math.abs(b) > Math.PI * 2 ? (b * Math.PI) / 180 : b;
+        turn = clamp1(bNorm * 1.2);
+      } else {
+        // If no angular data, still bias movement to keep going forward.
+        turn = 0;
+      }
+
+      const dist = safeNum(target.distance, NaN);
+      forward = Number.isFinite(dist) ? (dist > 4 ? 1.0 : 0.35) : 1.0;
+      strafe = 0;
+    }
 
     send({
       type: 'ACT',
       seq: ++seq,
-      forward,
-      strafe,
-      turn,
+      forward: clamp1(forward),
+      strafe: clamp1(strafe),
+      turn: clamp1(turn),
       jump: false,
       interact: false,
     });
@@ -104,10 +168,19 @@ function connect() {
     }
 
     if (msg.type === 'OBS') {
-      lastObs = msg;
+      latestObs = msg;
       const tick = msg.tick ?? msg.frame ?? '?';
       const perceivedCount = Array.isArray(msg.perceived) ? msg.perceived.length : 0;
-      console.log(`[OBS] tick=${tick} perceived=${perceivedCount} -> ${summarizePerceived(msg.perceived)}`);
+      const tower = pickTowerTarget(msg);
+      const towerTxt = tower ? ` | tower=${tower.id ?? 'unknown'} dist=${safeNum(tower.distance, NaN)}` : '';
+
+      console.log(`[OBS] tick=${tick} perceived=${perceivedCount} -> ${summarizePerceived(msg.perceived)}${towerTxt}`);
+
+      if (!loggedSchema && Array.isArray(msg.perceived) && msg.perceived[0]) {
+        loggedSchema = true;
+        console.log('[DEBUG] sample perceived object:', msg.perceived[0]);
+      }
+
       maybeInteract(msg);
       return;
     }
