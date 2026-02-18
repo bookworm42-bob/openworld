@@ -1,0 +1,24 @@
+{
+  "cycleId": "2026-02-18T00-21-59Z",
+  "vision": "OpenWorld evolves from a scenic walking prototype into a goal-directed micro-sandbox where an external agent can perceive, decide, and complete structured tasks end-to-end via the Agent API Bridge. The world should expose clear affordances (collect, inspect, activate, deliver), richer observation signals, and deterministic task instrumentation so playtests can verify capability growth instead of only visual quality.",
+  "objectives": [
+    "Introduce a lightweight objective loop with at least one complete quest chain (discover marker -> collect item -> activate world object -> receive completion state) fully playable by keyboard and bridge ACT/INTERACT messages.",
+    "Extend bridge OBS payload with explicit task-state fields (activeObjectiveId, objectiveStep, nearbyInteractables, inventorySummary) and emit deterministic event stamps for major world actions.",
+    "Add at least 3 new interactable world entities (e.g., pickup, switch, receiver) each with clear visual feedback states (idle/nearby/active/completed).",
+    "Implement a simple inventory/state subsystem that persists for the runtime session and is surfaced both in HUD and OBS.",
+    "Add anti-regression guardrails: no fatal startup errors, ACT timeout behavior preserved, and existing movement/jump/slow-mode controls remain functional.",
+    "Produce capture-friendly readability for task interactions: prompts visible within interaction range, completion feedback visible for >=2 seconds, and playtester route can finish within 180 seconds."
+  ],
+  "implementationHints": [
+    "Prefer additive architecture: create task/objective modules and keep current rendering/movement pipelines stable.",
+    "Use structured event constants so bridge, HUD, and playtest scripts can share semantics.",
+    "Keep OBS payload size bounded by summarizing nearby interactables to top-N nearest with distance + type + state.",
+    "Instrument task transitions with monotonic timestamps (ms) to support post-run analysis in play_result scoring.",
+    "Retain graceful primitive fallbacks for any new visual props to avoid blocking on external asset loads."
+  ],
+  "playtest": {
+    "type": "agent",
+    "durationSec": 180,
+    "capture": true
+  }
+}
