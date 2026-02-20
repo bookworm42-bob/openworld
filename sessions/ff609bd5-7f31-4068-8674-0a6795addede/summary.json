@@ -1,0 +1,17 @@
+{
+  "sessionId": "ff609bd5-7f31-4068-8674-0a6795addede",
+  "targetsVisited": [],
+  "interactionAttempts": 1,
+  "interactionResults": [
+    {
+      "result": "keypress-KeyE-sent"
+    }
+  ],
+  "screenshotFiles": [
+    "00-start.png",
+    "01-first-target.png",
+    "02-first-interaction.png",
+    "03-later-exploration.png"
+  ],
+  "endedAt": "2026-02-20T19:12:56.000Z"
+}
