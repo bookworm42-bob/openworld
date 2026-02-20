@@ -1,0 +1,14 @@
+{
+  "sessionId": "f2368895-d215-4abf-a068-6166eecfc989",
+  "targetsVisited": [],
+  "interactionAttempts": 0,
+  "interactionResults": [],
+  "screenshotFiles": [
+    "workspace/openworld/sessions/f2368895-d215-4abf-a068-6166eecfc989/screenshots/00-start.png",
+    "workspace/openworld/sessions/f2368895-d215-4abf-a068-6166eecfc989/screenshots/01-first-target.png",
+    "workspace/openworld/sessions/f2368895-d215-4abf-a068-6166eecfc989/screenshots/02-first-interaction.png",
+    "workspace/openworld/sessions/f2368895-d215-4abf-a068-6166eecfc989/screenshots/03-later-exploration.png"
+  ],
+  "endedAt": "2026-02-20T19:31:04Z",
+  "notes": "Controller connected and ACT loop ran at ~20Hz, but no OBS messages were received from bridge, so target selection/interactions could not trigger. Movement not visually confirmed. Patched agent-controller.mjs to avoid premature watchdog restart before first OBS and added ACT telemetry."
+}

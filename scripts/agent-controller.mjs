@@ -12,6 +12,8 @@ let latestObs = null;
 let loggedSchema = false;
 let lastInteractAt = 0;
 let lastSeenPerceivedAt = Date.now();
+let lastObsAt = 0;
+let lastActLogAt = 0;
 const NO_TARGET_RESTART_SEC = Number(process.env.NO_TARGET_RESTART_SEC || 35);
 let restarting = false;
 let roamTurnSign = 1;
@@ -134,20 +136,25 @@ function startActLoop() {
         turn = 0.45 * roamTurnSign;
       }
 
-      const blindForMs = Date.now() - lastSeenPerceivedAt;
-      if (!restarting && blindForMs > NO_TARGET_RESTART_SEC * 1000) {
-        restarting = true;
-        console.log(`[WATCHDOG] no perceived targets for ${(blindForMs / 1000).toFixed(1)}s -> requesting game restart`);
-        if (actTimer) clearInterval(actTimer);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.close(4000, 'no targets watchdog');
+      // Only engage watchdog after OBS stream has been seen at least once.
+      if (lastObsAt > 0) {
+        const blindForMs = Date.now() - lastSeenPerceivedAt;
+        if (!restarting && blindForMs > NO_TARGET_RESTART_SEC * 1000) {
+          restarting = true;
+          console.log(`[WATCHDOG] no perceived targets for ${(blindForMs / 1000).toFixed(1)}s -> requesting game restart`);
+          if (actTimer) clearInterval(actTimer);
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.close(4000, 'no targets watchdog');
+          }
+          setTimeout(() => process.exit(42), 250);
+          return;
         }
-        setTimeout(() => process.exit(42), 250);
-        return;
+      } else if (Date.now() - lastActLogAt > 5000) {
+        console.log('[WAIT] no OBS received yet; continuing ACT roam loop');
       }
     }
 
-    send({
+    const act = {
       type: 'ACT',
       seq: ++seq,
       forward: clamp1(forward),
@@ -155,7 +162,16 @@ function startActLoop() {
       turn: clamp1(turn),
       jump: false,
       interact: false,
-    });
+    };
+
+    const nowMs = Date.now();
+    if (nowMs - lastActLogAt > 1000) {
+      lastActLogAt = nowMs;
+      const mode = target ? 'target' : 'roam';
+      console.log(`[ACT] mode=${mode} seq=${act.seq} f=${act.forward.toFixed(2)} s=${act.strafe.toFixed(2)} t=${act.turn.toFixed(2)}`);
+    }
+
+    send(act);
   }, ACT_INTERVAL_MS);
 }
 
@@ -191,6 +207,7 @@ function connect() {
 
     if (msg.type === 'OBS') {
       latestObs = msg;
+      lastObsAt = Date.now();
       const tick = msg.tick ?? msg.frame ?? '?';
       const perceivedCount = Array.isArray(msg.perceived) ? msg.perceived.length : 0;
       if (perceivedCount > 0) lastSeenPerceivedAt = Date.now();
