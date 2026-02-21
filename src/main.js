@@ -2,6 +2,9 @@ import './style.css';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { AgentBridgeClient } from './agentBridge/client.js';
+import { buildObservation } from './agentBridge/perception.js';
+import { captureFrame } from './agentBridge/capture.js';
 import idleFbxUrl from '../3d_models/boy/SadIdle.fbx?url';
 import walkFbxUrl from '../3d_models/boy/Walking.fbx?url';
 import jumpFbxUrl from '../3d_models/boy/Jumping.fbx?url';
@@ -438,7 +441,8 @@ const interactable = {
   radius: 2.2,
   activated: false,
   promptEl: null,
-  statusEl: null
+  statusEl: null,
+  agentId: 'orb_spawn'
 };
 
 const modeHud = {
@@ -448,6 +452,67 @@ const modeHud = {
 const chunkHud = {
   el: null
 };
+
+const bridgeVelocity = new THREE.Vector3();
+const bridgeLastPlayerPos = new THREE.Vector3();
+const bridgeLatestPerceivedIds = new Set();
+const bridgePerceivableRoots = [];
+const bridgeOccluders = [];
+const bridgeEvents = [];
+let bridgeObsTick = 0;
+let bridgeStuckCounter = 0;
+
+function clampAxis(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return THREE.MathUtils.clamp(n, -1, 1);
+}
+
+function enqueueBridgeEvent(type, extra = {}) {
+  bridgeEvents.push({
+    type,
+    at: Number(clock.elapsedTime.toFixed(3)),
+    ...extra
+  });
+  if (bridgeEvents.length > 12) bridgeEvents.shift();
+}
+
+function recomputeBridgePerceptionSets() {
+  bridgePerceivableRoots.length = 0;
+  bridgeOccluders.length = 0;
+  scene.traverseVisible((object) => {
+    if (object.isMesh) bridgeOccluders.push(object);
+    if (object.userData?.agentPerceivable) bridgePerceivableRoots.push(object);
+  });
+}
+
+async function onBridgeCaptureRequest(request) {
+  if (!player) {
+    return { type: 'CAPTURED', cam: request.cam || 'follow', imgB64: '' };
+  }
+  return captureFrame({
+    request,
+    renderer,
+    scene,
+    camera,
+    player,
+    heading: lastMoveHeading,
+    nowSeconds: clock.elapsedTime
+  });
+}
+
+async function onBridgeEditRequest(request) {
+  return {
+    type: 'EDITED',
+    op: request.op || 'UNKNOWN',
+    result: 'unsupported'
+  };
+}
+
+const agentBridge = new AgentBridgeClient({
+  onCapture: onBridgeCaptureRequest,
+  onEdit: onBridgeEditRequest
+});
 
 const animPaths = {
   idle: idleFbxUrl,
@@ -804,6 +869,7 @@ async function loadCharacterAndAnimations() {
 
     player = loadedPlayer;
     scene.add(player);
+    bridgeLastPlayerPos.copy(player.position);
     snapPlayerFacingToHeading(lastMoveHeading);
 
     console.log(`[boot-debug] player normalized | pos=${formatVec3Debug(player.position)} scale=${formatVec3Debug(player.scale)}`);
@@ -856,6 +922,7 @@ async function loadCharacterAndAnimations() {
     player.position.set(0, 1, 0);
     player.castShadow = true;
     scene.add(player);
+    bridgeLastPlayerPos.copy(player.position);
     snapPlayerFacingToHeading(lastMoveHeading);
 
     markBootStage('characterReady', 'fallback-capsule');
@@ -1045,6 +1112,9 @@ async function createLandmarks() {
     mesh.position.set(x, y, z);
     mesh.rotation.y = 0.25 + index * 0.9;
     mesh.name = landmark.id;
+    mesh.userData.agentPerceivable = true;
+    mesh.userData.agentTag = landmark.type;
+    mesh.userData.agentId = landmark.id;
     scene.add(mesh);
   });
 
@@ -1053,6 +1123,7 @@ async function createLandmarks() {
 
 async function createSetDressing() {
   console.log('[boot-debug] createSetDressing: start');
+  let perceivablePropSeq = 0;
   const propAnchors = [
     { x: -6.5, z: -4.2, scale: 1.2 },
     { x: 7.4, z: 4.6, scale: 0.9 },
@@ -1094,11 +1165,17 @@ async function createSetDressing() {
       throw new Error('Critical Nature Kit assets missing for set dressing.');
     }
 
-    const placeNatureProp = (source, { x, z, scale, rotation = 0 }) => {
+    const placeNatureProp = (source, { x, z, scale, rotation = 0, perceivable = false, agentTag = 'object' }) => {
       const mesh = source.scene.clone(true);
       mesh.position.set(x, getTerrainHeightAt(x, z), z);
       mesh.scale.setScalar(scale);
       mesh.rotation.y = rotation;
+      if (perceivable) {
+        mesh.userData.agentPerceivable = true;
+        mesh.userData.agentTag = agentTag;
+        mesh.userData.agentId = `${agentTag}-${perceivablePropSeq}`;
+        perceivablePropSeq += 1;
+      }
       mesh.traverse((child) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -1113,36 +1190,44 @@ async function createSetDressing() {
         x: anchor.x,
         z: anchor.z,
         scale: anchor.scale * 1.45,
-        rotation: 0.6 + index * 0.9
+        rotation: 0.6 + index * 0.9,
+        perceivable: true,
+        agentTag: 'tree'
       });
 
       placeNatureProp(rockGltf, {
         x: anchor.x + 1.1,
         z: anchor.z + 0.4,
         scale: anchor.scale * 0.9,
-        rotation: index * 0.8
+        rotation: index * 0.8,
+        perceivable: true,
+        agentTag: 'rock'
       });
 
       placeNatureProp(logStackGltf, {
         x: anchor.x - 0.95,
         z: anchor.z + 0.2,
         scale: anchor.scale * 0.95,
-        rotation: -0.3 + index * 0.45
+        rotation: -0.3 + index * 0.45,
+        perceivable: true,
+        agentTag: 'log'
       });
     });
 
     // Foreground framing pass near spawn: two tree clusters + one low rock cluster.
     foregroundTreeClusters.forEach((cluster) => {
-      placeNatureProp(treeGltf, cluster);
+      placeNatureProp(treeGltf, { ...cluster, perceivable: true, agentTag: 'tree' });
       placeNatureProp(rockGltf, {
         x: cluster.x + Math.sign(cluster.x) * -1.15,
         z: cluster.z + 0.8,
         scale: cluster.scale * 0.62,
-        rotation: cluster.rotation * -0.8
+        rotation: cluster.rotation * -0.8,
+        perceivable: true,
+        agentTag: 'rock'
       });
     });
 
-    placeNatureProp(rockGltf, foregroundRockCluster);
+    placeNatureProp(rockGltf, { ...foregroundRockCluster, perceivable: true, agentTag: 'rock' });
 
     const ruinAccentSources = {
       damagedGrave: damagedGraveGltf,
@@ -1158,24 +1243,30 @@ async function createSetDressing() {
     console.warn('Nature Kit/ruin props failed to load, using primitive fallback:', error);
 
     const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x8b7b67, roughness: 0.85, metalness: 0.02 });
-    const placeFallback = ({ x, z, scale, rotation = 0 }) => {
+    const placeFallback = ({ x, z, scale, rotation = 0, perceivable = false, agentTag = 'object' }) => {
       const fallback = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 1.1, 6), fallbackMaterial);
       fallback.position.set(x, getTerrainHeightAt(x, z) + 0.55, z);
       fallback.scale.setScalar(scale);
       fallback.rotation.y = rotation;
       fallback.castShadow = true;
       fallback.receiveShadow = true;
+      if (perceivable) {
+        fallback.userData.agentPerceivable = true;
+        fallback.userData.agentTag = agentTag;
+        fallback.userData.agentId = `${agentTag}-${perceivablePropSeq}`;
+        perceivablePropSeq += 1;
+      }
       scene.add(fallback);
     };
 
     propAnchors.forEach((anchor, index) => {
-      placeFallback({ x: anchor.x, z: anchor.z, scale: anchor.scale, rotation: index * 0.7 });
+      placeFallback({ x: anchor.x, z: anchor.z, scale: anchor.scale, rotation: index * 0.7, perceivable: true, agentTag: 'tree' });
     });
 
     foregroundTreeClusters.forEach((cluster) => {
-      placeFallback(cluster);
+      placeFallback({ ...cluster, perceivable: true, agentTag: 'tree' });
     });
-    placeFallback(foregroundRockCluster);
+    placeFallback({ ...foregroundRockCluster, perceivable: true, agentTag: 'rock' });
 
     ruinAccentAnchors.forEach((anchor) => {
       placeFallback({ ...anchor, scale: anchor.scale * 0.7 });
@@ -1208,6 +1299,9 @@ function createInteractable() {
   base.add(orb);
 
   interactable.mesh = base;
+  interactable.mesh.userData.agentPerceivable = true;
+  interactable.mesh.userData.agentTag = 'orb';
+  interactable.mesh.userData.agentId = interactable.agentId;
   scene.add(base);
 
   interactable.promptEl = document.createElement('div');
@@ -1251,6 +1345,19 @@ function triggerInteraction() {
     : 'Orb calms down.';
   interactable.statusEl.classList.add('show');
   setTimeout(() => interactable.statusEl?.classList.remove('show'), 1400);
+  enqueueBridgeEvent('interaction', {
+    targetId: interactable.agentId,
+    result: interactable.activated ? 'activated' : 'deactivated'
+  });
+}
+
+function tryTriggerInteraction(targetId = interactable.agentId) {
+  if (!player || !interactable.mesh) return false;
+  const distance = player.position.distanceTo(interactable.mesh.position);
+  if (distance > interactable.radius) return false;
+  if (targetId && targetId !== interactable.agentId) return false;
+  triggerInteraction();
+  return true;
 }
 
 function updateModeHud() {
@@ -1296,8 +1403,7 @@ function onKey(isDown, e) {
   }
 
   if (isDown && e.code === 'KeyE' && player && interactable.mesh) {
-    const distance = player.position.distanceTo(interactable.mesh.position);
-    if (distance <= interactable.radius) triggerInteraction();
+    tryTriggerInteraction();
   }
 
   if (isDown && e.code === 'KeyT') {
@@ -1314,9 +1420,19 @@ function updatePlayer(delta) {
   if (!player) return;
 
   const moveSpeed = 4.4;
+  const nowMs = performance.now();
+  const bridgeAct = agentBridge.getActState(nowMs);
+  const keyboardTurn = ((keys.ArrowRight || keys.KeyD) ? 1 : 0) - ((keys.ArrowLeft || keys.KeyA) ? 1 : 0);
+  const keyboardForward = (keys.ArrowUp || keys.KeyW) ? 1 : 0;
+  const turnInput = clampAxis(keyboardTurn + bridgeAct.turn);
+  const forwardInput = clampAxis(keyboardForward + bridgeAct.forward);
+  const movingForward = Math.abs(forwardInput) > 0.05;
 
-  const turnInput = ((keys.ArrowRight || keys.KeyD) ? 1 : 0) - ((keys.ArrowLeft || keys.KeyA) ? 1 : 0);
-  const movingForward = keys.ArrowUp || keys.KeyW;
+  if (!jumping && bridgeAct.jump) {
+    jumping = true;
+    velocityY = jumpVelocity;
+    if (actions.jump) setAction('jump', 0.08);
+  }
 
   if (turnInput !== 0) {
     // Tank-style steering: rotate heading at a capped yaw speed.
@@ -1327,7 +1443,7 @@ function updatePlayer(delta) {
   playerMoveDirection.set(0, 0, 0);
   if (movingForward) {
     playerMoveDirection.copy(lastMoveHeading);
-    player.position.addScaledVector(playerMoveDirection, moveSpeed * delta);
+    player.position.addScaledVector(playerMoveDirection, moveSpeed * forwardInput * delta);
 
     if (actions.walk && !jumping) setAction('walk', 0.16);
   } else if (actions.idle && !jumping) {
@@ -1367,6 +1483,73 @@ function updatePlayer(delta) {
       orb.material.emissiveIntensity = interactable.activated ? 1.05 : 0.65 + (Math.sin(t * 4.4) + 1) * 0.12;
     }
   }
+
+  if (agentBridge.consumeOneShotInteract(nowMs)) {
+    tryTriggerInteraction();
+  }
+
+  const queuedInteract = agentBridge.consumeInteractRequest();
+  if (queuedInteract) {
+    const ok = tryTriggerInteraction(queuedInteract.targetId);
+    agentBridge.send({
+      type: 'INTERACTED',
+      targetId: queuedInteract.targetId || interactable.agentId,
+      result: ok ? 'ok' : 'out_of_range'
+    });
+  }
+
+  const previousX = bridgeLastPlayerPos.x;
+  const previousY = bridgeLastPlayerPos.y;
+  const previousZ = bridgeLastPlayerPos.z;
+  bridgeLastPlayerPos.copy(player.position);
+  if (delta > 0) {
+    bridgeVelocity.set(
+      (player.position.x - previousX) / delta,
+      (player.position.y - previousY) / delta,
+      (player.position.z - previousZ) / delta
+    );
+  } else {
+    bridgeVelocity.set(0, 0, 0);
+  }
+  const movedSq = (player.position.x - previousX) ** 2 + (player.position.z - previousZ) ** 2;
+  if (movingForward && movedSq < 0.000001) bridgeStuckCounter += 1;
+  else bridgeStuckCounter = 0;
+}
+
+function updateBridge(nowMs) {
+  if (!player) return;
+
+  if (agentBridge.shouldSendObs(nowMs)) {
+    recomputeBridgePerceptionSets();
+    const obs = buildObservation({
+      nowSeconds: clock.elapsedTime,
+      tick: bridgeObsTick,
+      player,
+      velocity: bridgeVelocity,
+      grounded: !jumping,
+      heading: lastMoveHeading,
+      stuck: bridgeStuckCounter > 8,
+      events: bridgeEvents.splice(0, bridgeEvents.length),
+      perceivableRoots: bridgePerceivableRoots,
+      occluders: bridgeOccluders,
+      latestPerceivedIds: bridgeLatestPerceivedIds
+    });
+    agentBridge.sendObs(obs);
+    bridgeObsTick += 1;
+  }
+
+  void agentBridge.pumpCaptureRequests({
+    renderer,
+    scene,
+    camera,
+    player,
+    heading: lastMoveHeading,
+    nowSeconds: clock.elapsedTime
+  });
+  void agentBridge.pumpEditRequests({
+    scene,
+    player
+  });
 }
 
 let renderLoopStarted = false;
@@ -1378,6 +1561,7 @@ function render() {
     const scaledDelta = delta * timeScale;
     if (mixer) mixer.update(scaledDelta);
     updatePlayer(scaledDelta);
+    updateBridge(performance.now());
     updateFollowCamera(scaledDelta);
     updatePlayerRimLight();
     updateTerrainChunkVisibility();
@@ -1444,6 +1628,7 @@ window.addEventListener('resize', () => {
   const bootStartedAt = performance.now();
 
   try {
+    agentBridge.connect();
     createInteractable();
     markBootStage('coreUiReady', 'HUD + interactable created');
 

@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "playtest:run": "node scripts/playtest-runner.cjs",
+    "playtest:anim": "node scripts/playwright-anim-check.cjs",
+    "playtest:webgl": "node test-webgl.cjs"
   },
   "dependencies": {
     "three": "^0.174.0"

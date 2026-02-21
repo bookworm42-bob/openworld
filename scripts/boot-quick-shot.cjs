@@ -1,21 +1,10 @@
-const { chromium } = require('playwright');
+const { launchChromium } = require('./lib/launch-playwright.cjs');
 
 (async () => {
   let browser;
   try {
     const targetUrl = process.env.BOOT_CHECK_URL || 'http://127.0.0.1:4173/';
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--use-gl=swiftshader',
-        '--use-angle=swiftshader',
-        '--enable-unsafe-swiftshader',
-        '--ignore-gpu-blocklist',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu-sandbox'
-      ]
-    });
+    browser = await launchChromium();
 
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });

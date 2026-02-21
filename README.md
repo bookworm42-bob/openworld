@@ -34,6 +34,31 @@ npm run dev
 
 Open the local URL shown by Vite (usually `http://127.0.0.1:5173` or similar).
 
+## Agent API Bridge (v1)
+
+The game runs on the normal Vite dev port, and in parallel starts a local bridge server:
+
+- Game UI: `http://localhost:5173` (or Vite-assigned port)
+- Agent API (WebSocket): `ws://localhost:8787`
+- Bridge health check (HTTP): `http://localhost:8787`
+
+Bridge behavior:
+
+- `HELLO`, `OBS`, `ACT`, `INTERACT`, `CAPTURE`, `EDIT` message flow
+- OBS emission is ticked and rate-limited (default 20 Hz)
+- ACT is applied in simulation update (no OS key events)
+- ACT times out to neutral after 500ms
+- Perception is range + FOV + occlusion filtered (sensor-like; no god-mode)
+
+### Bridge config (env vars)
+
+- `VITE_AGENT_BRIDGE_WS_PORT` (default `8787`)
+- `VITE_AGENT_OBS_HZ` (default `20`)
+- `VITE_AGENT_PERCEPTION_RANGE` (default `15`)
+- `VITE_AGENT_PERCEPTION_FOV_DEG` (default `95`)
+- `VITE_AGENT_OBS_MODE` (`realistic` default, `dev` to include `self.pos`)
+- `VITE_AGENT_ENABLE_EDIT` (`1` to enable builder `EDIT`; default disabled)
+
 ### 3) Production build
 
 ```bash
@@ -55,9 +80,10 @@ If they are missing, animation loading will fail and fallback rendering may be u
 
 ---
 
-## Optional: CPU/software WebGL validation (headless VPS)
+## Optional: Legacy CPU/software WebGL validation (headless VPS only)
 
 Only use this when GPU/WebGL isn’t available in your host browser runtime.
+Default local mode is GPU-capable browser launch.
 
 ### WebGL probe
 
@@ -87,6 +113,12 @@ node scripts/msg322-anim-shot.cjs
 
 Screenshots are written to `artifacts/`.
 
+Legacy software mode (only when required):
+
+```bash
+PLAYWRIGHT_LAUNCH_MODE=legacy-software node scripts/msg322-anim-shot.cjs
+```
+
 ---
 
 ## Automation instruction files
@@ -97,6 +129,15 @@ Cron workers read these instruction files:
 - `automation/reviewer.md`
 - `automation/playtest.md`
 - `automation/status-report.md`
+- `automation/notification-policy.md`
+
+## Managed playtest runner (recommended)
+
+Use one-shot runner so preview/playtest processes are always cleaned up:
+
+```bash
+node scripts/playtest-runner.cjs
+```
 
 ## Slow mode (for playtest)
 

@@ -1,23 +1,12 @@
-const { chromium } = require('playwright');
 const path = require('path');
+const { launchChromium } = require('./lib/launch-playwright.cjs');
 
 (async () => {
   let browser;
   let page;
   const outPath = path.join('artifacts', 'boot-deterministic.png');
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--use-gl=swiftshader',
-        '--use-angle=swiftshader',
-        '--enable-unsafe-swiftshader',
-        '--ignore-gpu-blocklist',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu-sandbox',
-      ],
-    });
+    browser = await launchChromium();
 
     page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     page.on('console', (m) => {

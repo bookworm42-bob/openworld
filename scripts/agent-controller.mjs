@@ -18,6 +18,8 @@ const NO_TARGET_RESTART_SEC = Number(process.env.NO_TARGET_RESTART_SEC || 35);
 let restarting = false;
 let roamTurnSign = 1;
 let lastRoamFlipAt = 0;
+let currentTargetId = null;
+let lastTurnCmd = 0;
 
 function send(obj) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -45,9 +47,14 @@ function summarizePerceived(perceived = []) {
     .join(', ');
 }
 
-function pickTarget(obs) {
+function pickTarget(obs, preferredTargetId = null) {
   const perceived = Array.isArray(obs?.perceived) ? obs.perceived : [];
   if (perceived.length === 0) return null;
+
+  if (preferredTargetId) {
+    const preferred = perceived.find((p) => p?.id === preferredTargetId);
+    if (preferred) return preferred;
+  }
 
   // Prioritize interactables, then nearest.
   const scored = perceived
@@ -101,17 +108,36 @@ function startActLoop() {
     let strafe = 0;
     let turn = 0.35 * Math.sin(t * 0.8); // search scan fallback
 
-    const target = pickTarget(latestObs);
+    const target = pickTarget(latestObs, currentTargetId);
     if (target) {
+      currentTargetId = target.id;
       const bearing = safeNum(target.bearing, 0);
       const dist = safeNum(target.dist, 999);
+      const absBearing = Math.abs(bearing);
 
-      turn = clamp1(bearing * 1.6);
-      forward = dist > 2 ? 1.0 : 0.25;
+      // Turn mostly to face target first, then move more aggressively.
+      const TURN_DEADZONE = 0.08;
+      const TURN_HARD_ANGLE = 0.85;
+      const turnGain = 1.05;
+      const desiredTurn =
+        absBearing < TURN_DEADZONE
+          ? 0
+          : clamp1(Math.sign(bearing) * Math.min(0.65, ((absBearing - TURN_DEADZONE) / (TURN_HARD_ANGLE - TURN_DEADZONE)) * turnGain));
+
+      // Smooth steering to avoid over-correct/oscillation.
+      turn = lastTurnCmd * 0.7 + desiredTurn * 0.3;
+      lastTurnCmd = turn;
+
+      // Gate forward speed by alignment and distance.
+      if (absBearing > 0.7) forward = 0.05;
+      else if (dist > 3.0) forward = 0.95 * (1 - Math.min(absBearing, 0.7));
+      else if (dist > 2.0) forward = 0.6 * (1 - Math.min(absBearing, 0.7));
+      else forward = 0.18;
       strafe = 0;
 
       maybeInteractWithTarget(target);
     } else {
+      currentTargetId = null;
       // Nothing perceived: roam with obstacle avoidance so we keep exploring.
       const ray = latestObs?.sensors?.ray || {};
       const front = safeNum(ray.front, 99);
@@ -135,6 +161,7 @@ function startActLoop() {
         forward = 0.9;
         turn = 0.45 * roamTurnSign;
       }
+      lastTurnCmd = turn;
 
       // Only engage watchdog after OBS stream has been seen at least once.
       if (lastObsAt > 0) {
@@ -211,7 +238,7 @@ function connect() {
       const tick = msg.tick ?? msg.frame ?? '?';
       const perceivedCount = Array.isArray(msg.perceived) ? msg.perceived.length : 0;
       if (perceivedCount > 0) lastSeenPerceivedAt = Date.now();
-      const target = pickTarget(msg);
+      const target = pickTarget(msg, currentTargetId);
       const targetTxt = target
         ? ` | target=${target.id} tag=${target.tag ?? 'obj'} dist=${safeNum(target.dist, NaN).toFixed(2)} bearing=${safeNum(target.bearing, NaN).toFixed(3)}`
         : '';
