@@ -1,0 +1,90 @@
+OpenWorld Current Architecture Snapshot
+Generated: 2026-02-22 (repo scan based)
+
+Scope:
+- This snapshot summarizes what is currently implemented in `openworld` and what is not.
+- Use it as baseline context before proposing new cycle tasks.
+- Always validate against current code, because this file can go stale.
+
+Repository roots and path rules:
+- Canonical repo root is `openworld/`.
+- All loop state should be under:
+  - `sim/` (task board, feedback, cycle specs/results, SLA signal)
+  - `artifacts/` (playtest screenshots and outputs)
+- Avoid writing to parent-level `workspace/sim` or `workspace/workspace/openworld/...`.
+
+Current playable game/runtime:
+- Stack: Three.js + Vite (`src/main.js`).
+- Character:
+  - Idle/walk/jump FBX clips loaded from `3d_models/boy/*`.
+  - Tank-style movement + jump.
+- World:
+  - Terrain chunks + camera follow.
+  - Landmarks and set dressing (trees/rocks/logs/ruin accents).
+  - Orb interactable near spawn.
+- Manual controls:
+  - move/turn/jump/interact + slow mode.
+
+Bridge architecture (implemented):
+- Relay server: `agentBridge/wsRelayServer.js` (local ws relay, default port 8787).
+- Browser game client bridge: `src/agentBridge/client.js`.
+- Observation builder: `src/agentBridge/perception.js`.
+- Capture support: `src/agentBridge/capture.js`.
+- Main loop integration in `src/main.js`:
+  - connects as game role,
+  - consumes ACT/INTERACT,
+  - emits OBS,
+  - handles CAPTURE/EDIT requests.
+- Message families present:
+  - HELLO, OBS, ACT, INTERACT, INTERACTED, CAPTURE, CAPTURED, EDIT, EDITED.
+
+Perception/object visibility state:
+- Perceivable tagging exists and is wired.
+- Confirmed perceivable categories include:
+  - orb interactable,
+  - landmarks (tower/windmill/ruins types),
+  - near-spawn set dressing (trees/rocks/logs) via tags/ids.
+- Perception is range/FOV/occlusion filtered with simple affordance labels.
+
+Agent playtest/control scripts (implemented):
+- Main exploration controller:
+  - `scripts/agent-exploration-first-steps.mjs`
+  - target pursuit + roam + visited/cooldown/stall logic
+  - periodic bridge-native CAPTURE saves (`CAPTURE_EVERY_SEC`, `SHOTS_DIR`)
+- Orchestrated runner:
+  - `scripts/run-agent-exploration.sh`
+  - kills occupied ports, starts dev server, waits for readiness, runs controller, optional before/after snapshots.
+- Snapshot helper:
+  - `scripts/visual-snapshot.cjs`
+
+What currently works well:
+- End-to-end bridge connectivity path exists.
+- Agent can drive the character through ACT and receive OBS.
+- Automated 45s run flow exists with screenshot outputs.
+
+Known limitations/gaps (high priority):
+- Gameplay progression/story depth is minimal.
+- Agent behavior quality is still heuristic (not robust long-horizon planning).
+- Targeting can still oscillate/stall in some scenes.
+- Visual/art direction goals are partially documented but not fully enforced in runtime.
+- Cron loop state has had path drift in earlier runs; prompts now guard against this but must be monitored.
+
+Process-state inconsistency to be aware of:
+- `sim/task_feedback.jsonl` previously reported a "deterministic sim scaffold" implementation.
+- Current `openworld` HEAD does not contain `src/sim/*` or `scripts/sim-runner.mjs`.
+- Treat this as history mismatch/noise; Designer should prioritize verifiable in-repo state over old claims.
+
+Design priority guidance for next cycles:
+1. Prefer visible gameplay impact per cycle:
+   - better navigation robustness,
+   - better interaction outcomes,
+   - richer world feedback/story moments,
+   - improved visual readability/composition.
+2. Allow infra/technical work only when it directly unblocks or improves measured playtest outcomes.
+3. Require each proposed task to map to a playtest-visible metric.
+
+Minimum verification expectation for any cycle:
+- `npm run build` passes.
+- 45s agent playtest runs.
+- OBS seen, ACT loop healthy, screenshot outputs non-blank and representative.
+

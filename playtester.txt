@@ -7,11 +7,8 @@ Shared coordination files:
 - `sim/cycles/<cycleId>/spec.json`
 - `sim/cycles/<cycleId>/exec_result.json` (if present)
 
-15h SLA (mandatory first step):
-- If any non-tested task is older than 15h from `createdAt`, escalate to Q:
-  - write `sim/q_signal.json` with task and reason
-  - stop/remove cron jobs `Prompt A (Designer)`, `Prompt B (Executor)`, `Prompt C (Playtester)`
-  - stop
+First, ensure working directory is OpenWorld repo root:
+- `cd openworld` (or equivalent path to the repo root in this environment).
 
 Task selection:
 - Pick one task with status `implemented`.
