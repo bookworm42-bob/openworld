@@ -17,8 +17,12 @@ SHOTS_DIR="${SHOTS_DIR:-$OPENWORLD_DIR/artifacts/agent-runs/$RUN_ID}"
 
 DEV_LOG="${DEV_LOG:-$OPENWORLD_DIR/.agent-dev.log}"
 WAIT_TIMEOUT_SEC="${WAIT_TIMEOUT_SEC:-25}"
+BROWSER_CLIENT_ENABLED="${BROWSER_CLIENT_ENABLED:-1}"
+BROWSER_CLIENT_LOG="${BROWSER_CLIENT_LOG:-$OPENWORLD_DIR/.agent-browser-client.log}"
+BROWSER_CLIENT_WAIT_SEC="${BROWSER_CLIENT_WAIT_SEC:-4}"
 
 DEV_PID=""
+BROWSER_CLIENT_PID=""
 
 find_port_pids() {
   local port="$1"
@@ -90,6 +94,12 @@ wait_tcp() {
 
 cleanup() {
   local code=$?
+  if [ -n "$BROWSER_CLIENT_PID" ] && kill -0 "$BROWSER_CLIENT_PID" >/dev/null 2>&1; then
+    echo "[CLEANUP] stopping browser client pid=$BROWSER_CLIENT_PID"
+    kill "$BROWSER_CLIENT_PID" >/dev/null 2>&1 || true
+    sleep 0.2
+    kill -9 "$BROWSER_CLIENT_PID" >/dev/null 2>&1 || true
+  fi
   if [ -n "$DEV_PID" ] && kill -0 "$DEV_PID" >/dev/null 2>&1; then
     echo "[CLEANUP] stopping dev server pid=$DEV_PID"
     kill "$DEV_PID" >/dev/null 2>&1 || true
@@ -128,6 +138,21 @@ if ! wait_tcp "127.0.0.1" "$BRIDGE_PORT" "$WAIT_TIMEOUT_SEC"; then
 fi
 
 echo "[READY] dev reachable at $DEV_URL"
+if [ "$BROWSER_CLIENT_ENABLED" = "1" ]; then
+  echo "[START] browser client -> $DEV_URL"
+  DEV_URL="$DEV_URL" BROWSER_CLIENT_HARD_REFRESH="${BROWSER_CLIENT_HARD_REFRESH:-1}" \
+    node scripts/browser-client-keepalive.cjs >"$BROWSER_CLIENT_LOG" 2>&1 &
+  BROWSER_CLIENT_PID=$!
+  sleep "$BROWSER_CLIENT_WAIT_SEC"
+  if ! kill -0 "$BROWSER_CLIENT_PID" >/dev/null 2>&1; then
+    echo "[ERROR] browser client failed to start"
+    echo "[ERROR] recent browser client log:"
+    tail -n 80 "$BROWSER_CLIENT_LOG" || true
+    exit 1
+  fi
+  echo "[READY] browser client pid=$BROWSER_CLIENT_PID log=$BROWSER_CLIENT_LOG"
+fi
+
 if [ "$TAKE_SCREENSHOTS" = "1" ]; then
   mkdir -p "$SHOTS_DIR"
   DEV_URL="$DEV_URL" OUT_PATH="$SHOTS_DIR/00-before-agent.png" WAIT_MS="$SHOT_WAIT_MS" \
