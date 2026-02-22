@@ -53,6 +53,7 @@ s wrong with it - and possibly continue it.
   - `deleteAfterRun = true`
   - `sessionTarget = "isolated"`
   - `wakeMode = "now"`
+  - `thinking = "medium"`
 
 Shared task board schema (`sim/task_board.json`):
 {
@@ -94,6 +95,10 @@ Design spec file (`sim/cycles/<cycleId>/spec.json`) schema:
 }
 
 Additional directives:
+- Thinking profile:
+  - Set this through the cron job `thinking` parameter (not just narrative text).
+  - Designer runs should use `thinking = "xhigh"`.
+  - Jobs spawned for Executor/Playtester should use `thinking = "medium"` unless explicitly overridden.
 - You may provide detailed implementation guidance when needed.
 - You may propose improvements in game design and content direction, including:
   - world composition and level/readability flow

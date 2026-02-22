@@ -82,6 +82,9 @@ For any cron job you create above, use one-off settings explicitly:
 - `deleteAfterRun = true`
 - `sessionTarget = "isolated"`
 - `wakeMode = "now"`
+- Set via cron job `thinking` parameter
+- `thinking = "medium"` for `Prompt B (Executor)` and `Prompt C (Playtester)`
+- `thinking = "xhigh"` for `Prompt A (Designer)`
 
 Always delete your own one-off `Prompt C (Playtester)` cron job before stopping.
 
