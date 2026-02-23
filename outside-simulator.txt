@@ -46,7 +46,8 @@ s wrong with it - and possibly continue it.
 - Create `sim/cycles/<cycleId>/`.
 - Write `sim/cycles/<cycleId>/spec.json`.
 - Update pointer `sim/latest.json`.
-- Add new tasks to shared board with 15h deadline.
+- Add exactly ONE new task to shared board with 15h deadline.
+- The task must be comprehensive (not a tiny patch) and should materially improve gameplay quality in one cohesive implementation objective.
 - Schedule ONE isolated one-off job `Prompt B (Executor)` using `executor.txt`.
 - When creating that cron job, use one-off settings explicitly:
   - `schedule.kind = "at"`
@@ -86,7 +87,7 @@ Design spec file (`sim/cycles/<cycleId>/spec.json`) schema:
   "implementationDetails": [
     "module-level steps, interfaces/data shape, edge cases, validation criteria, rollout notes"
   ],
-  "taskIds": ["task-<cycleId>-1", "task-<cycleId>-2"],
+  "taskId": "task-<cycleId>-1",
   "playtest": {
     "type": "agent",
     "durationSec": 180,
@@ -100,6 +101,7 @@ Additional directives:
   - Designer runs should use `thinking = "xhigh"`.
   - Jobs spawned for Executor/Playtester should use `thinking = "medium"` unless explicitly overridden.
 - You may provide detailed implementation guidance when needed.
+- Each cycle must produce exactly one high-impact, end-to-end task (no multi-task splitting in the same cycle).
 - You may propose improvements in game design and content direction, including:
   - world composition and level/readability flow
   - gameplay mechanics and interaction loops

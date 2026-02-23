@@ -88,3 +88,11 @@ Minimum verification expectation for any cycle:
 - 45s agent playtest runs.
 - OBS seen, ACT loop healthy, screenshot outputs non-blank and representative.
 
+Delta update (2026-02-23T23:29Z):
+- `openworld/sim/` had cycle/task directories but no state files; loop state has now been re-seeded under:
+  - `sim/task_board.json`
+  - `sim/task_feedback.jsonl`
+  - `sim/latest.json`
+- Runtime still has a single direct interactable loop (orb toggle) and no multi-step objective progression.
+- `package.json` + README reference `scripts/playtest-runner.cjs`, but that file is currently missing in repo; use `scripts/run-agent-exploration.sh` as the verified playtest path until restored.
+
