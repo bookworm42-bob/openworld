@@ -18,8 +18,20 @@ State transition at start:
 - Set task status to `in_testing`.
 
 Playtest run (required):
-- From OpenWorld root run:
+- Use the working exploration flow as baseline:
+  - `./scripts/run-agent-exploration.sh`
+- You may adapt runtime and test script based on what you are validating.
+- Default profile:
   - `RUN_SEC=45 CAPTURE_EVERY_SEC=10 TAKE_SCREENSHOTS=0 SHOTS_DIR=artifacts/try-<cycleId>-<taskId> ./scripts/run-agent-exploration.sh`
+- Adaptive duration policy:
+  - You may use shorter runs for quick smoke checks and longer runs for interaction/progression validation.
+  - Allowed range: `RUN_SEC` 30 to 180.
+  - If 45s is inconclusive but core loop is healthy, re-run with a longer duration before final verdict.
+  - Maximum reruns per task: 2 additional runs after the initial run (max 3 total runs per task in one playtester execution).
+- Script flexibility:
+  - You may create or modify playtest-focused scripts when needed to validate behavior.
+  - Keep variants under `scripts/playtest-*.mjs|cjs|sh` and base them on the working exploration example.
+  - Record exactly which script and parameters were used in the result file.
 
 Review inputs:
 - Run terminal logs
@@ -49,10 +61,15 @@ Write result:
   "taskId": "<taskId>",
   "status": "pass|fail|partial",
   "summary": "overall playtest result",
+  "runConfig": {
+    "script": "path to script used",
+    "runSec": number,
+    "captureEverySec": number
+  },
   "observations": ["key findings"],
   "metrics": {
-    "runSec": 45,
-    "captureEverySec": 10,
+    "runSec": number,
+    "captureEverySec": number,
     "screenshotCount": number,
     "obsReceived": true,
     "actLoopHealthy": true
