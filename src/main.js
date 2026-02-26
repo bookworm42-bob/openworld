@@ -73,6 +73,9 @@ const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const ORIGIN = new THREE.Vector3(0, 0, 0);
 const playerTurnQuat = new THREE.Quaternion();
 const lastMoveHeading = new THREE.Vector3(0, 0, -1);
+const objectiveToTargetVec = new THREE.Vector3();
+const objectiveFlatForward = new THREE.Vector3();
+const objectiveFlatToTarget = new THREE.Vector3();
 let cameraFollowInitialized = false;
 const PLAYER_TURN_SPEED = 1.8;
 const PLAYER_VISUAL_YAW_OFFSET = Math.PI;
@@ -443,6 +446,17 @@ const BEACON_LAYOUT = [
   { id: 'beacon_3', label: 'Beacon III', position: new THREE.Vector2(60, 28) }
 ];
 
+const OBJECTIVE_APPROACH = {
+  farRadius: 7.2,
+  nearRadius: 4.6,
+  lockRadius: 2.55,
+  lockBearingRad: 0.32,
+  attuneRadius: 2.45,
+  attuneBearingRad: 0.22,
+  lockStableMsRequired: 320,
+  slowDownStartRadius: 5.5
+};
+
 const pilgrimageQuest = {
   questId: 'beacon_pilgrimage',
   phase: 'intro',
@@ -454,9 +468,25 @@ const pilgrimageQuest = {
   promptEl: null,
   statusEl: null,
   objectiveHudEl: null,
+  lockHudEl: null,
+  nextCueEl: null,
   completionBannerEl: null,
   completionBannerTimer: null,
   recentEvents: []
+};
+
+const objectiveApproachRuntime = {
+  phase: 'far',
+  lockStableMs: 0,
+  canAttune: false,
+  activeBeaconDist: null,
+  activeBeaconBearing: null,
+  lockAcquiredAtMs: 0,
+  lastPhase: 'far',
+  lastObjectiveId: null,
+  attuneStartedAtMs: 0,
+  cueBeaconId: null,
+  cueUntilMs: 0
 };
 
 const modeHud = {
@@ -1432,6 +1462,37 @@ function createBeacon({ id, label, position }) {
   beam.visible = false;
   base.add(beam);
 
+  const lockRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.72, 0.055, 10, 30),
+    new THREE.MeshBasicMaterial({
+      color: 0xb8ecff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  lockRing.rotation.x = Math.PI / 2;
+  lockRing.position.y = 0.48;
+  lockRing.visible = false;
+  base.add(lockRing);
+
+  const cueRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.85, 1.16, 44),
+    new THREE.MeshBasicMaterial({
+      color: 0xa9f6ff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    })
+  );
+  cueRing.rotation.x = -Math.PI / 2;
+  cueRing.position.y = 0.07;
+  cueRing.visible = false;
+  base.add(cueRing);
+
   const x = position.x;
   const z = position.y;
   const y = getTerrainHeightAt(x, z) + 0.19;
@@ -1447,10 +1508,10 @@ function createBeacon({ id, label, position }) {
   registerStaticColliderForObject(base, {
     colliderId: id,
     colliderTag: 'beacon',
-    radiusScale: 0.62,
-    radiusPadding: 0.22,
-    minRadius: 0.72,
-    maxRadius: 1.25
+    radiusScale: 0.56,
+    radiusPadding: 0.15,
+    minRadius: 0.64,
+    maxRadius: 1.12
   });
 
   return {
@@ -1459,37 +1520,173 @@ function createBeacon({ id, label, position }) {
     mesh: base,
     core,
     beam,
+    lockRing,
+    cueRing,
+    pulseStartAt: 0,
+    pulseType: null,
     state: 'inactive',
     baseCoreY: core.position.y
   };
 }
 
-function getObjectiveSnapshot() {
+function getActiveBeaconGuidance() {
   const activeBeacon = getActiveBeacon();
-  let guidance = null;
+  if (!player || !activeBeacon?.mesh) return null;
 
-  if (player && activeBeacon?.mesh) {
-    const toTarget = new THREE.Vector3().subVectors(activeBeacon.mesh.position, player.position);
-    const dist = toTarget.length();
+  objectiveToTargetVec.subVectors(activeBeacon.mesh.position, player.position);
+  const dist = objectiveToTargetVec.length();
 
-    const flatForward = lastMoveHeading.clone().setY(0);
-    if (flatForward.lengthSq() < 0.0001) flatForward.set(0, 0, -1);
-    else flatForward.normalize();
+  objectiveFlatForward.copy(lastMoveHeading).setY(0);
+  if (objectiveFlatForward.lengthSq() < 0.0001) objectiveFlatForward.set(0, 0, -1);
+  else objectiveFlatForward.normalize();
 
-    const flatToTarget = toTarget.setY(0);
-    if (flatToTarget.lengthSq() > 0.0001) {
-      flatToTarget.normalize();
-      const bearing = Math.atan2(
-        flatForward.x * flatToTarget.z - flatForward.z * flatToTarget.x,
-        flatForward.dot(flatToTarget)
-      );
-      guidance = {
-        dist: Number(dist.toFixed(2)),
-        bearing: Number(bearing.toFixed(3)),
-        inInteractionRange: dist <= pilgrimageQuest.radius
-      };
+  objectiveFlatToTarget.copy(objectiveToTargetVec).setY(0);
+  if (objectiveFlatToTarget.lengthSq() < 0.0001) return null;
+  objectiveFlatToTarget.normalize();
+
+  const bearing = Math.atan2(
+    objectiveFlatForward.x * objectiveFlatToTarget.z - objectiveFlatForward.z * objectiveFlatToTarget.x,
+    objectiveFlatForward.dot(objectiveFlatToTarget)
+  );
+
+  return {
+    dist,
+    bearing,
+    beacon: activeBeacon
+  };
+}
+
+function clearObjectiveCueIfExpired(nowMs = performance.now()) {
+  if (objectiveApproachRuntime.cueUntilMs > 0 && nowMs >= objectiveApproachRuntime.cueUntilMs) {
+    objectiveApproachRuntime.cueUntilMs = 0;
+    objectiveApproachRuntime.cueBeaconId = null;
+    if (pilgrimageQuest.nextCueEl) pilgrimageQuest.nextCueEl.classList.remove('show');
+  }
+}
+
+function triggerNextObjectiveCue(beacon) {
+  if (!beacon) return;
+  objectiveApproachRuntime.cueBeaconId = beacon.id;
+  objectiveApproachRuntime.cueUntilMs = performance.now() + 2400;
+  if (pilgrimageQuest.nextCueEl) {
+    pilgrimageQuest.nextCueEl.textContent = `${beacon.label} now active`;
+    pilgrimageQuest.nextCueEl.classList.add('show');
+  }
+}
+
+function updateObjectiveSnapshotRuntime(nowMs = performance.now()) {
+  clearObjectiveCueIfExpired(nowMs);
+
+  const guidance = getActiveBeaconGuidance();
+  if (!guidance) {
+    objectiveApproachRuntime.phase = pilgrimageQuest.phase === 'completed' ? 'complete' : 'far';
+    objectiveApproachRuntime.lockStableMs = 0;
+    objectiveApproachRuntime.canAttune = false;
+    objectiveApproachRuntime.activeBeaconDist = null;
+    objectiveApproachRuntime.activeBeaconBearing = null;
+    return null;
+  }
+
+  const dist = guidance.dist;
+  const bearing = guidance.bearing;
+  objectiveApproachRuntime.activeBeaconDist = dist;
+  objectiveApproachRuntime.activeBeaconBearing = bearing;
+
+  let nextPhase = 'far';
+  if (dist <= OBJECTIVE_APPROACH.lockRadius) nextPhase = 'lock';
+  else if (dist <= OBJECTIVE_APPROACH.nearRadius) nextPhase = 'approach';
+
+  const facingGood = Math.abs(bearing) <= OBJECTIVE_APPROACH.lockBearingRad;
+  const inLockWindow = nextPhase === 'lock' && facingGood;
+
+  if (objectiveApproachRuntime.lastObjectiveId !== pilgrimageQuest.activeObjectiveId) {
+    objectiveApproachRuntime.lockStableMs = 0;
+    objectiveApproachRuntime.lockAcquiredAtMs = 0;
+    objectiveApproachRuntime.canAttune = false;
+    objectiveApproachRuntime.lastPhase = 'far';
+    objectiveApproachRuntime.lastObjectiveId = pilgrimageQuest.activeObjectiveId;
+  }
+
+  if (inLockWindow) {
+    if (objectiveApproachRuntime.lockAcquiredAtMs <= 0) objectiveApproachRuntime.lockAcquiredAtMs = nowMs;
+    objectiveApproachRuntime.lockStableMs = Math.max(0, nowMs - objectiveApproachRuntime.lockAcquiredAtMs);
+  } else {
+    objectiveApproachRuntime.lockStableMs = 0;
+    objectiveApproachRuntime.lockAcquiredAtMs = 0;
+  }
+
+  objectiveApproachRuntime.phase = nextPhase;
+  objectiveApproachRuntime.canAttune = nextPhase === 'lock'
+    && dist <= OBJECTIVE_APPROACH.attuneRadius
+    && Math.abs(bearing) <= OBJECTIVE_APPROACH.attuneBearingRad
+    && objectiveApproachRuntime.lockStableMs >= OBJECTIVE_APPROACH.lockStableMsRequired;
+
+  return {
+    dist,
+    bearing,
+    inInteractionRange: dist <= pilgrimageQuest.radius,
+    inAttuneRadius: dist <= OBJECTIVE_APPROACH.attuneRadius,
+    phase: objectiveApproachRuntime.phase,
+    lockStableMs: Math.round(objectiveApproachRuntime.lockStableMs),
+    canAttune: objectiveApproachRuntime.canAttune
+  };
+}
+
+function updateObjectiveLockSignals(nowMs = performance.now()) {
+  const activeBeacon = getActiveBeacon();
+  const activeId = activeBeacon?.id || null;
+  const currentPhase = objectiveApproachRuntime.phase;
+  const lockNow = objectiveApproachRuntime.canAttune;
+
+  if (pilgrimageQuest.lockHudEl) {
+    if (pilgrimageQuest.phase === 'completed' || !activeId) {
+      pilgrimageQuest.lockHudEl.classList.remove('show', 'locked');
+      pilgrimageQuest.lockHudEl.textContent = '';
+    } else {
+      pilgrimageQuest.lockHudEl.classList.add('show');
+      if (lockNow) {
+        pilgrimageQuest.lockHudEl.classList.add('locked');
+        pilgrimageQuest.lockHudEl.textContent = `${activeBeacon.label} lock stable · attune ready`;
+      } else if (currentPhase === 'lock') {
+        pilgrimageQuest.lockHudEl.classList.remove('locked');
+        const pct = Math.round(Math.min(100, (objectiveApproachRuntime.lockStableMs / OBJECTIVE_APPROACH.lockStableMsRequired) * 100));
+        pilgrimageQuest.lockHudEl.textContent = `Stabilizing lock… ${pct}%`;
+      } else if (currentPhase === 'approach') {
+        pilgrimageQuest.lockHudEl.classList.remove('locked');
+        pilgrimageQuest.lockHudEl.textContent = `Approach ${activeBeacon.label} and align`;
+      } else {
+        pilgrimageQuest.lockHudEl.classList.remove('locked');
+        pilgrimageQuest.lockHudEl.textContent = `Tracking ${activeBeacon.label}`;
+      }
     }
   }
+
+  const prevPhase = objectiveApproachRuntime.lastPhase;
+  if (activeId && prevPhase !== 'lock' && currentPhase === 'lock') {
+    rememberQuestEvent('objective_lock_acquired', {
+      objectiveId: activeId,
+      lockStableMs: Math.round(objectiveApproachRuntime.lockStableMs),
+      activeBeaconDist: Number((objectiveApproachRuntime.activeBeaconDist || 0).toFixed(2)),
+      activeBeaconBearing: Number((objectiveApproachRuntime.activeBeaconBearing || 0).toFixed(3))
+    });
+  }
+
+  if (activeId && prevPhase === 'lock' && currentPhase !== 'lock') {
+    rememberQuestEvent('objective_lock_lost', {
+      objectiveId: activeId,
+      phase: currentPhase,
+      lockStableMs: Math.round(objectiveApproachRuntime.lockStableMs),
+      activeBeaconDist: Number((objectiveApproachRuntime.activeBeaconDist || 0).toFixed(2)),
+      activeBeaconBearing: Number((objectiveApproachRuntime.activeBeaconBearing || 0).toFixed(3))
+    });
+  }
+
+  objectiveApproachRuntime.lastPhase = currentPhase;
+  clearObjectiveCueIfExpired(nowMs);
+}
+
+function getObjectiveSnapshot() {
+  const guidance = updateObjectiveSnapshotRuntime();
 
   return {
     questId: pilgrimageQuest.questId,
@@ -1497,7 +1694,26 @@ function getObjectiveSnapshot() {
     activeObjectiveId: pilgrimageQuest.activeObjectiveId,
     completedObjectiveIds: [...pilgrimageQuest.completedObjectiveIds],
     progress: Number(pilgrimageQuest.progress.toFixed(3)),
-    guidance,
+    guidance: guidance
+      ? {
+        dist: Number(guidance.dist.toFixed(2)),
+        bearing: Number(guidance.bearing.toFixed(3)),
+        inInteractionRange: guidance.inInteractionRange,
+        inAttuneRadius: guidance.inAttuneRadius,
+        approachPhase: guidance.phase,
+        lockStableMs: guidance.lockStableMs,
+        canAttune: guidance.canAttune
+      }
+      : null,
+    approachPhase: objectiveApproachRuntime.phase,
+    lockStableMs: Math.round(objectiveApproachRuntime.lockStableMs),
+    canAttune: Boolean(objectiveApproachRuntime.canAttune),
+    activeBeaconDist: Number.isFinite(objectiveApproachRuntime.activeBeaconDist)
+      ? Number(objectiveApproachRuntime.activeBeaconDist.toFixed(2))
+      : null,
+    activeBeaconBearing: Number.isFinite(objectiveApproachRuntime.activeBeaconBearing)
+      ? Number(objectiveApproachRuntime.activeBeaconBearing.toFixed(3))
+      : null,
     recentEvents: pilgrimageQuest.recentEvents.slice(-6).map((entry) => ({ ...entry }))
   };
 }
@@ -1589,6 +1805,18 @@ function syncBeaconQuestPhase() {
   updateObjectiveHud();
 }
 
+function resetObjectiveApproachRuntime() {
+  objectiveApproachRuntime.phase = pilgrimageQuest.phase === 'completed' ? 'complete' : 'far';
+  objectiveApproachRuntime.lockStableMs = 0;
+  objectiveApproachRuntime.canAttune = false;
+  objectiveApproachRuntime.activeBeaconDist = null;
+  objectiveApproachRuntime.activeBeaconBearing = null;
+  objectiveApproachRuntime.lockAcquiredAtMs = 0;
+  objectiveApproachRuntime.lastPhase = objectiveApproachRuntime.phase;
+  objectiveApproachRuntime.lastObjectiveId = pilgrimageQuest.activeObjectiveId;
+  objectiveApproachRuntime.attuneStartedAtMs = 0;
+}
+
 function startBeaconQuest() {
   pilgrimageQuest.phase = 'intro';
   pilgrimageQuest.activeObjectiveId = BEACON_LAYOUT[0]?.id || null;
@@ -1596,6 +1824,7 @@ function startBeaconQuest() {
   pilgrimageQuest.progress = 0;
   pilgrimageQuest.recentEvents.length = 0;
   syncBeaconQuestPhase();
+  resetObjectiveApproachRuntime();
   rememberQuestEvent('objective_started', {
     objectiveId: pilgrimageQuest.activeObjectiveId,
     phase: pilgrimageQuest.phase,
@@ -1616,6 +1845,14 @@ function createBeaconQuestUi() {
   pilgrimageQuest.objectiveHudEl = document.createElement('div');
   pilgrimageQuest.objectiveHudEl.id = 'objective-hud';
   document.body.appendChild(pilgrimageQuest.objectiveHudEl);
+
+  pilgrimageQuest.lockHudEl = document.createElement('div');
+  pilgrimageQuest.lockHudEl.id = 'objective-lock-hud';
+  document.body.appendChild(pilgrimageQuest.lockHudEl);
+
+  pilgrimageQuest.nextCueEl = document.createElement('div');
+  pilgrimageQuest.nextCueEl.id = 'objective-next-cue';
+  document.body.appendChild(pilgrimageQuest.nextCueEl);
 
   pilgrimageQuest.completionBannerEl = document.createElement('div');
   pilgrimageQuest.completionBannerEl.id = 'quest-complete-banner';
@@ -1666,7 +1903,13 @@ function updateInteractionUI() {
 
   const activeBeacon = getActiveBeacon();
   if (nearby.beacon.id === activeBeacon?.id) {
-    pilgrimageQuest.promptEl.textContent = `Press E to attune ${nearby.beacon.label}`;
+    if (objectiveApproachRuntime.canAttune) {
+      pilgrimageQuest.promptEl.textContent = `Press E to attune ${nearby.beacon.label}`;
+    } else if (objectiveApproachRuntime.phase === 'lock') {
+      pilgrimageQuest.promptEl.textContent = `Hold alignment for attunement lock on ${nearby.beacon.label}`;
+    } else {
+      pilgrimageQuest.promptEl.textContent = `Approach and align with ${nearby.beacon.label}`;
+    }
   } else if (pilgrimageQuest.phase === 'completed') {
     pilgrimageQuest.promptEl.textContent = `${nearby.beacon.label} is already attuned`;
   } else {
@@ -1692,10 +1935,17 @@ function updateObjectiveHud() {
   pilgrimageQuest.objectiveHudEl.textContent = `Objective: Attune ${activeBeacon?.label || 'next beacon'} · ${completed}/3 complete`;
 }
 
+function triggerBeaconPulse(beacon, pulseType = 'attune') {
+  if (!beacon) return;
+  beacon.pulseStartAt = clock.elapsedTime;
+  beacon.pulseType = pulseType;
+}
+
 function completeActiveBeacon(beacon) {
   if (!beacon || pilgrimageQuest.completedObjectiveIds.includes(beacon.id)) return;
 
   pilgrimageQuest.completedObjectiveIds.push(beacon.id);
+  triggerBeaconPulse(beacon, 'attune');
   rememberQuestEvent('objective_completed', {
     objectiveId: beacon.id,
     progress: Number((pilgrimageQuest.completedObjectiveIds.length / BEACON_LAYOUT.length).toFixed(3))
@@ -1703,6 +1953,7 @@ function completeActiveBeacon(beacon) {
 
   const before = pilgrimageQuest.activeObjectiveId;
   syncBeaconQuestPhase();
+  resetObjectiveApproachRuntime();
 
   showQuestStatus(`${beacon.label} attuned.`);
   enqueueBridgeEvent('interaction', {
@@ -1724,7 +1975,11 @@ function completeActiveBeacon(beacon) {
       progress: pilgrimageQuest.progress
     });
     const nextBeacon = getActiveBeacon();
-    if (nextBeacon) showQuestStatus(`${beacon.label} attuned. ${nextBeacon.label} is now active.`);
+    if (nextBeacon) {
+      triggerBeaconPulse(nextBeacon, 'next_cue');
+      triggerNextObjectiveCue(nextBeacon);
+      showQuestStatus(`${beacon.label} attuned. ${nextBeacon.label} is now active.`);
+    }
   }
 }
 
@@ -1738,6 +1993,8 @@ function tryTriggerInteraction(targetId = null) {
 
   const distance = player.position.distanceTo(targetBeacon.mesh.position);
   if (distance > pilgrimageQuest.radius) return false;
+
+  updateObjectiveSnapshotRuntime();
 
   if (pilgrimageQuest.phase === 'completed') {
     showQuestStatus('The pilgrimage is already complete.');
@@ -1763,12 +2020,30 @@ function tryTriggerInteraction(targetId = null) {
     return true;
   }
 
+  if (!objectiveApproachRuntime.canAttune) {
+    showQuestStatus('Attunement lock not stable yet. Align with the active beacon.');
+    enqueueBridgeEvent('interaction', {
+      targetId: targetBeacon.id,
+      result: 'lock_unstable',
+      lockStableMs: Math.round(objectiveApproachRuntime.lockStableMs)
+    });
+    return true;
+  }
+
+  objectiveApproachRuntime.attuneStartedAtMs = performance.now();
+  rememberQuestEvent('attunement_started', {
+    objectiveId: targetBeacon.id,
+    lockStableMs: Math.round(objectiveApproachRuntime.lockStableMs),
+    activeBeaconDist: Number((objectiveApproachRuntime.activeBeaconDist || distance).toFixed(2)),
+    activeBeaconBearing: Number((objectiveApproachRuntime.activeBeaconBearing || 0).toFixed(3))
+  });
   completeActiveBeacon(targetBeacon);
   return true;
 }
 
 function updateBeaconVisuals() {
   const t = clock.elapsedTime;
+  const activeId = pilgrimageQuest.activeObjectiveId;
 
   pilgrimageQuest.beacons.forEach((beacon, index) => {
     if (!beacon.core) return;
@@ -1788,6 +2063,49 @@ function updateBeaconVisuals() {
       beacon.core.position.y = beacon.baseCoreY + Math.sin(t * 0.9 + index) * 0.018;
       beacon.core.material.emissiveIntensity = 0.25 + pulse * 0.12;
       beacon.beam.visible = false;
+    }
+
+    if (beacon.lockRing) {
+      const lockVisible = beacon.id === activeId && objectiveApproachRuntime.phase === 'lock';
+      beacon.lockRing.visible = lockVisible;
+      if (lockVisible) {
+        const lockGlow = 0.28 + Math.min(1, objectiveApproachRuntime.lockStableMs / OBJECTIVE_APPROACH.lockStableMsRequired) * 0.62;
+        beacon.lockRing.material.opacity = objectiveApproachRuntime.canAttune ? 0.9 : lockGlow;
+        const ringScale = objectiveApproachRuntime.canAttune ? 1.08 : 0.97 + pulse * 0.08;
+        beacon.lockRing.scale.setScalar(ringScale);
+      }
+    }
+
+    if (beacon.cueRing) {
+      const cueVisible = objectiveApproachRuntime.cueBeaconId === beacon.id && objectiveApproachRuntime.cueUntilMs > performance.now();
+      beacon.cueRing.visible = cueVisible;
+      if (cueVisible) {
+        const cuePulse = Math.sin(t * 5.2 + index * 0.8) * 0.5 + 0.5;
+        beacon.cueRing.material.opacity = 0.24 + cuePulse * 0.38;
+        const cueScale = 1 + cuePulse * 0.3;
+        beacon.cueRing.scale.set(cueScale, cueScale, cueScale);
+      }
+    }
+
+    if (beacon.pulseStartAt > 0 && beacon.pulseType) {
+      const elapsed = t - beacon.pulseStartAt;
+      const duration = beacon.pulseType === 'next_cue' ? 1.8 : 1.25;
+      if (elapsed >= duration) {
+        beacon.pulseStartAt = 0;
+        beacon.pulseType = null;
+      } else {
+        const k = elapsed / duration;
+        const amp = beacon.pulseType === 'next_cue' ? 0.4 : 0.65;
+        const burst = (1 - k) * amp;
+        beacon.core.scale.setScalar(1 + burst * 0.28);
+        beacon.core.material.emissiveIntensity += burst * 0.95;
+        if (beacon.beam?.material) {
+          beacon.beam.visible = true;
+          beacon.beam.material.opacity = Math.min(0.92, beacon.beam.material.opacity + burst * 0.72);
+        }
+      }
+    } else {
+      beacon.core.scale.setScalar(1);
     }
   });
 }
@@ -1859,6 +2177,7 @@ function updatePlayer(delta) {
   const turnInput = clampAxis(keyboardTurn + bridgeAct.turn);
   const forwardInput = clampAxis(keyboardForward + bridgeAct.forward);
   const movingForward = Math.abs(forwardInput) > 0.05;
+  const objectiveGuidance = updateObjectiveSnapshotRuntime(nowMs);
 
   if (!jumping && bridgeAct.jump) {
     jumping = true;
@@ -1866,9 +2185,14 @@ function updatePlayer(delta) {
     if (actions.jump) setAction('jump', 0.08);
   }
 
+  const closeObjectiveDist = objectiveGuidance?.dist ?? Number.POSITIVE_INFINITY;
+  const closeObjectiveBearing = Math.abs(objectiveGuidance?.bearing ?? 0);
+  const isNearObjective = Number.isFinite(closeObjectiveDist) && closeObjectiveDist <= OBJECTIVE_APPROACH.nearRadius;
+  const turnDamping = isNearObjective ? THREE.MathUtils.clamp(closeObjectiveDist / OBJECTIVE_APPROACH.nearRadius, 0.42, 1) : 1;
+
   if (turnInput !== 0) {
     // Tank-style steering: rotate heading at a capped yaw speed.
-    playerTurnQuat.setFromAxisAngle(WORLD_UP, -turnInput * PLAYER_TURN_SPEED * delta);
+    playerTurnQuat.setFromAxisAngle(WORLD_UP, -turnInput * PLAYER_TURN_SPEED * turnDamping * delta);
     lastMoveHeading.applyQuaternion(playerTurnQuat).normalize();
   }
 
@@ -1880,8 +2204,19 @@ function updatePlayer(delta) {
   playerMoveDirection.set(0, 0, 0);
   if (movingForward) {
     playerMoveDirection.copy(lastMoveHeading);
-    desiredX += playerMoveDirection.x * moveSpeed * forwardInput * delta;
-    desiredZ += playerMoveDirection.z * moveSpeed * forwardInput * delta;
+
+    let objectiveSlow = 1;
+    if (Number.isFinite(closeObjectiveDist) && closeObjectiveDist <= OBJECTIVE_APPROACH.slowDownStartRadius) {
+      const span = OBJECTIVE_APPROACH.slowDownStartRadius - OBJECTIVE_APPROACH.attuneRadius;
+      const normalized = THREE.MathUtils.clamp((closeObjectiveDist - OBJECTIVE_APPROACH.attuneRadius) / Math.max(0.0001, span), 0, 1);
+      objectiveSlow = 0.34 + normalized * 0.66;
+      if (closeObjectiveBearing > 0.85 && closeObjectiveDist < OBJECTIVE_APPROACH.lockRadius + 0.7) {
+        objectiveSlow *= 0.7;
+      }
+    }
+
+    desiredX += playerMoveDirection.x * moveSpeed * forwardInput * objectiveSlow * delta;
+    desiredZ += playerMoveDirection.z * moveSpeed * forwardInput * objectiveSlow * delta;
 
     if (actions.walk && !jumping) setAction('walk', 0.16);
   } else if (actions.idle && !jumping) {
@@ -1900,7 +2235,7 @@ function updatePlayer(delta) {
     playerYMin,
     playerYMax,
     colliders: nearbyColliders,
-    iterations: 4
+    iterations: isNearObjective ? 6 : 4
   });
 
   player.position.x = motionResult.x;
@@ -1977,6 +2312,7 @@ function updatePlayer(delta) {
   }
 
   updateInteractionUI();
+  updateObjectiveLockSignals(nowMs);
   updateBeaconVisuals();
 
   if (agentBridge.consumeOneShotInteract(nowMs)) {

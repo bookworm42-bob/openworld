@@ -145,3 +145,50 @@ canvas {
   padding: 8px 10px;
   backdrop-filter: blur(3px);
 }
+
+#objective-lock-hud,
+#objective-next-cue {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease, transform 160ms ease;
+}
+
+#objective-lock-hud {
+  top: 44px;
+  color: #dff7ff;
+  background: rgba(6, 26, 45, 0.68);
+  border: 1px solid rgba(117, 218, 255, 0.42);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+#objective-lock-hud.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+#objective-lock-hud.locked {
+  color: #dffff1;
+  border-color: rgba(110, 255, 194, 0.6);
+  background: rgba(8, 44, 29, 0.76);
+}
+
+#objective-next-cue {
+  top: 74px;
+  color: #effdff;
+  background: rgba(7, 36, 56, 0.74);
+  border: 1px solid rgba(139, 228, 255, 0.45);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+#objective-next-cue.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

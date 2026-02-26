@@ -1,0 +1,43 @@
+Task: task-2026-02-26T22-30-52-343Z-1
+Cycle: 2026-02-26T22-30-52-343Z
+
+What was implemented
+- Added active-beacon approach state machine in runtime/objective snapshot: far -> approach -> lock with lock stability timer and canAttune gating.
+- Added new objective metadata in OBS/objective payload: approachPhase, lockStableMs, canAttune, activeBeaconDist, activeBeaconBearing (+ guidance mirrors).
+- Added new progression/interaction events: objective_lock_acquired, objective_lock_lost, attunement_started.
+- Polished close-range navigation near active beacon with objective-aware turn damping + forward slowdown to reduce in-range orbit/stall.
+- Tuned beacon collider registration (still solid but less sticky at attune distance).
+- Added progression feedback: lock HUD, next-objective cue HUD, lock ring + pulse cues around beacons.
+- Updated scripts/playtest-beacon-pilgrimage.mjs to consume lock metadata/events and enforce max in-range hesitation guard.
+
+Primary test command
+ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T22-30-52-343Z-task-2026-02-26T22-30-52-343Z-1 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh
+
+Required env vars / flags / script path
+- AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs
+- Optional strict lock hesitation threshold: LOCK_HESITATION_MAX_MS=3000 (default in script)
+- Bridge/dev setup handled by run-agent-exploration.sh (includes VITE_AGENT_BRIDGE_WS_URL and browser keepalive)
+
+Expected success signals in logs/events
+- [OPEN] connected
+- [OBS] first observation received
+- [LOCK] acquired ... then [LOCK] attunement_started for each objective
+- [MISSION] objective_completed beacon_1 / beacon_2 / beacon_3
+- [MISSION] quest_completed progress=1
+- [METRIC] max_in_range_hesitation_ms=<value <=3000>
+
+What to verify visually
+- Near active beacon, agent no longer circles/stalls for seconds inside interaction range.
+- Lock/readiness feedback appears (lock HUD and beacon lock visuals) before attunement.
+- After each attunement, next-objective cue appears and progression remains readable.
+- Screenshot pair confirms world/player render and post-run state:
+  - artifacts/try-2026-02-26T22-30-52-343Z-task-2026-02-26T22-30-52-343Z-1/00-before-agent.png
+  - artifacts/try-2026-02-26T22-30-52-343Z-task-2026-02-26T22-30-52-343Z-1/99-after-agent.png
+
+Known caveats / failure modes
+- When CAPTURE_ENABLED=1 (agent-side CAPTURE requests), some runs can start with stale objective-hint behavior (distance not updating); if seen, re-run with CAPTURE_ENABLED=0 and rely on TAKE_SCREENSHOTS=1 for visual evidence.
+- Collision events near tower/beacons are expected briefly during approach; prolonged collision loops should not persist.
+
+Suggested extra tests (optional)
+- Re-run seeds 101/202/303 to confirm stable lock behavior and hesitation metric remains under 3s.
+- Try LOCK_HESITATION_MAX_MS=2000 to pressure-test final-meter behavior.

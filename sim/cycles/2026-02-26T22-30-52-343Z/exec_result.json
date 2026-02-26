@@ -1,0 +1,71 @@
+{
+  "taskId": "task-2026-02-26T22-30-52-343Z-1",
+  "cycleId": "2026-02-26T22-30-52-343Z",
+  "status": "implemented",
+  "summary": "Implemented beacon encounter polish with lock-aware approach/attunement state, close-range motion damping, lock/next-objective gameplay feedback, extended objective OBS/events, and a lock-aware pilgrimage controller update.",
+  "changedFiles": [
+    "src/main.js",
+    "src/style.css",
+    "scripts/playtest-beacon-pilgrimage.mjs",
+    "sim/task_board.json",
+    "sim/tasks/task-2026-02-26T22-30-52-343Z-1/executor_state.json",
+    "sim/cycles/2026-02-26T22-30-52-343Z/exec_result.json",
+    "sim/cycles/2026-02-26T22-30-52-343Z/playtest_handoff.txt"
+  ],
+  "build": {
+    "command": "npm run build",
+    "result": "pass"
+  },
+  "selfTests": [
+    {
+      "command": "ROAM_SEED=101 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-101.log:80 [MISSION] quest_completed progress=1",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-101.log:81 [METRIC] max_in_range_hesitation_ms=157",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-101.log:26 [LOCK] attunement_started objective=beacon_1 lockStableMs=2329"
+      ]
+    },
+    {
+      "command": "ROAM_SEED=202 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-202.log:89 [MISSION] quest_completed progress=1",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-202.log:90 [METRIC] max_in_range_hesitation_ms=365",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-202.log:67 [LOCK] attunement_started objective=beacon_2 lockStableMs=2566"
+      ]
+    },
+    {
+      "command": "ROAM_SEED=303 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-303.log:97 [MISSION] quest_completed progress=1",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-303.log:98 [METRIC] max_in_range_hesitation_ms=157",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-303.log:73 [LOCK] attunement_started objective=beacon_2 lockStableMs=504"
+      ]
+    },
+    {
+      "command": "ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-404.log:86 [MISSION] quest_completed progress=1",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-404.log:87 [METRIC] max_in_range_hesitation_ms=361",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-404.log:84 [LOCK] attunement_started objective=beacon_3 lockStableMs=3536"
+      ]
+    },
+    {
+      "command": "ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T22-30-52-343Z-task-2026-02-26T22-30-52-343Z-1 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-404-shots.log:92 [MISSION] quest_completed progress=1",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-404-shots.log:12 [SNAPSHOT] saved artifacts/try-2026-02-26T22-30-52-343Z-task-2026-02-26T22-30-52-343Z-1/00-before-agent.png",
+        "artifacts/executor/2026-02-26T22-30-52-343Z/playtest-seed-404-shots.log:96 [SNAPSHOT] saved artifacts/try-2026-02-26T22-30-52-343Z-task-2026-02-26T22-30-52-343Z-1/99-after-agent.png"
+      ]
+    }
+  ],
+  "notes": [
+    "Objective OBS payload remains backward compatible; new fields are optional (approachPhase, lockStableMs, canAttune, activeBeaconDist, activeBeaconBearing).",
+    "New bridge/quest events added: objective_lock_acquired, objective_lock_lost, attunement_started.",
+    "Observed max in-range hesitation stayed below 3s threshold across seeded runs (157ms, 365ms, 157ms, 361ms)."
+  ]
+}

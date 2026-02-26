@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T22:30:52.343Z",
+  "updatedAt": "2026-02-26T22:43:39.733Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -27,11 +27,12 @@
       "taskId": "task-2026-02-26T22-30-52-343Z-1",
       "cycleId": "2026-02-26T22-30-52-343Z",
       "title": "Beacon attunement encounter polish (lock-on approach + progression feedback)",
-      "status": "proposed",
+      "status": "implemented",
       "createdAt": "2026-02-26T22:30:52.343Z",
       "deadlineAt": "2026-02-27T13:30:52.343Z",
       "owner": "executor",
-      "notes": "Deliver close-range beacon interaction reliability + clearer attunement feedback; remove in-range orbit/stall behavior while keeping collision solidity."
+      "notes": "Shipped lock-aware beacon approach/attunement polish, HUD/cue feedback, objective lock telemetry/events, and lock-aware pilgrimage controller; seeded self-tests 101/202/303/404 + screenshot run passed.",
+      "updatedAt": "2026-02-26T22:43:39.733Z"
     }
   ]
 }

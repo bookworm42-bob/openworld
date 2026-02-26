@@ -13,6 +13,8 @@ const NAV_BLOCKED_MS = Number(process.env.NAV_BLOCKED_MS || 1700);
 const NAV_PRESSURE_THRESHOLD = Number(process.env.NAV_PRESSURE_THRESHOLD || 0.62);
 const RECOVERY_BACKOFF_MS = Number(process.env.RECOVERY_BACKOFF_MS || 900);
 const RECOVERY_ARC_MS = Number(process.env.RECOVERY_ARC_MS || 1300);
+const LOCK_HESITATION_MAX_MS = Number(process.env.LOCK_HESITATION_MAX_MS || 3000);
+const LOCK_INTERACT_COOLDOWN_MS = Number(process.env.LOCK_INTERACT_COOLDOWN_MS || 1200);
 const CAPTURE_ENABLED = process.env.CAPTURE_ENABLED !== '0';
 const CAPTURE_EVERY_SEC = Number(process.env.CAPTURE_EVERY_SEC || 18);
 const CAPTURE_W = Number(process.env.CAPTURE_W || 1280);
@@ -45,6 +47,9 @@ let recoveryMode = null;
 let recoveryUntilMs = 0;
 let recoveryTurnSign = 1;
 let lastRecoveryAt = 0;
+let inRangeSinceMs = 0;
+let maxInRangeHesitationMs = 0;
+let runFailedForHesitation = false;
 
 const RNG_SEED = Number(process.env.ROAM_SEED || Date.now());
 let rngState = (RNG_SEED >>> 0) || 1;
@@ -234,7 +239,24 @@ function buildAct(obs) {
     else if (dist > 3.2) forward = 0.72;
     else if (dist > 2.3) forward = 0.36;
 
-    const readyToInteract = dist <= TARGET_ARRIVAL_DIST && Math.abs(bearing) < 0.24 && nowMs - lastInteractAt > 1800;
+    const objective = obs?.objective || {};
+    const guidance = objective?.guidance || {};
+    const canAttune = Boolean(objective?.canAttune || guidance?.canAttune);
+    const approachPhase = objective?.approachPhase || guidance?.approachPhase || null;
+    const inAttuneRadius = Boolean(guidance?.inAttuneRadius) || dist <= TARGET_ARRIVAL_DIST;
+
+    if (inAttuneRadius && target.id === objective?.activeObjectiveId && !canAttune) {
+      if (!inRangeSinceMs) inRangeSinceMs = nowMs;
+      const hesitationMs = nowMs - inRangeSinceMs;
+      if (hesitationMs > maxInRangeHesitationMs) maxInRangeHesitationMs = hesitationMs;
+    } else {
+      inRangeSinceMs = 0;
+    }
+
+    const readyToInteract = canAttune
+      ? nowMs - lastInteractAt > LOCK_INTERACT_COOLDOWN_MS
+      : dist <= TARGET_ARRIVAL_DIST && Math.abs(bearing) < 0.24 && nowMs - lastInteractAt > 1800;
+
     const stalled = nowMs - lastTargetProgressAt > TARGET_STALL_MS;
     const timedOut = nowMs - targetLockStartedAt > RECOVERY_TIMEOUT_MS * 2;
     const navBlocked = Boolean(nav?.blocked)
@@ -242,7 +264,10 @@ function buildAct(obs) {
       && safeNum(nav?.frontPressure, 0) >= NAV_PRESSURE_THRESHOLD;
 
     const interact = readyToInteract;
-    if (interact) lastInteractAt = nowMs;
+    if (interact) {
+      lastInteractAt = nowMs;
+      inRangeSinceMs = 0;
+    }
 
     if (stalled || timedOut || navBlocked) {
       beginRecovery(
@@ -254,7 +279,7 @@ function buildAct(obs) {
     }
 
     return {
-      mode: 'objective',
+      mode: canAttune ? 'objective_lock' : (approachPhase ? `objective_${approachPhase}` : 'objective'),
       targetId: target.id,
       targetDist: dist,
       targetBearing: bearing,
@@ -365,11 +390,20 @@ function startActLoop() {
       const objective = latestObs?.objective || {};
       const active = objective?.activeObjectiveId || 'none';
       const progress = Number(objective?.progress || 0).toFixed(2);
+      const lockStableMs = Number(objective?.lockStableMs || objective?.guidance?.lockStableMs || 0);
       const targetTxt = base.targetId ? ` target=${base.targetId} dist=${safeNum(base.targetDist, NaN).toFixed(2)}` : '';
-      console.log(`[ACT] mode=${base.mode} t=${tSec.toFixed(1)} active=${active} progress=${progress} interact=${base.interact}${targetTxt}`);
+      console.log(`[ACT] mode=${base.mode} t=${tSec.toFixed(1)} active=${active} progress=${progress} lockStableMs=${lockStableMs}${targetTxt} interact=${base.interact}`);
+    }
+
+    if (!runFailedForHesitation && maxInRangeHesitationMs > LOCK_HESITATION_MAX_MS) {
+      runFailedForHesitation = true;
+      console.error(`[FAIL] in-range hesitation exceeded threshold max=${Math.round(maxInRangeHesitationMs)}ms limit=${LOCK_HESITATION_MAX_MS}ms`);
+      stop(3);
+      return;
     }
 
     if (questCompleted) {
+      console.log(`[METRIC] max_in_range_hesitation_ms=${Math.round(maxInRangeHesitationMs)}`);
       console.log('[SUCCESS] quest_completed observed; finishing run');
       stop(0);
     }
@@ -421,7 +455,18 @@ ws.addEventListener('message', (event) => {
       }
       if (ev.type === 'objective_completed') {
         if (ev.objectiveId) completedObjectives.add(ev.objectiveId);
+        inRangeSinceMs = 0;
         console.log(`[MISSION] objective_completed ${ev.objectiveId || 'unknown'} progress=${ev.progress ?? 'n/a'}`);
+      }
+      if (ev.type === 'objective_lock_acquired') {
+        console.log(`[LOCK] acquired objective=${ev.objectiveId || 'unknown'} dist=${ev.activeBeaconDist ?? 'n/a'} bearing=${ev.activeBeaconBearing ?? 'n/a'}`);
+      }
+      if (ev.type === 'objective_lock_lost') {
+        console.log(`[LOCK] lost objective=${ev.objectiveId || 'unknown'} phase=${ev.phase || 'n/a'} dist=${ev.activeBeaconDist ?? 'n/a'}`);
+      }
+      if (ev.type === 'attunement_started') {
+        inRangeSinceMs = 0;
+        console.log(`[LOCK] attunement_started objective=${ev.objectiveId || 'unknown'} lockStableMs=${ev.lockStableMs ?? 'n/a'}`);
       }
       if (ev.type === 'rejected') {
         console.log(`[MISSION] rejected objective=${ev.objectiveId || 'unknown'} expected=${ev.expectedObjectiveId || 'unknown'}`);
