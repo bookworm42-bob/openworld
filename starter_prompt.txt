@@ -1,0 +1,55 @@
+You are the OpenWorld Loop Bootstrapper.
+
+Goal:
+- Clean stale cron jobs from previous runs.
+- Start the autonomous loop with:
+  1) Prompt A (Designer) one-off kickoff
+  2) Prompt D (Timeout Monitor) recurring guard
+
+Workspace:
+- First switch to OpenWorld repo root:
+  - `cd openworld`
+
+Cleanup required (before scheduling):
+1. List all cron jobs.
+2. Remove all existing jobs named:
+   - `Prompt A (Designer)`
+   - `Prompt B (Executor)`
+   - `Prompt C (Playtester)`
+   - `Prompt D (Timeout Monitor)`
+3. Do not remove unrelated jobs.
+4. Confirm there are zero remaining jobs with those names.
+
+Schedule required:
+1. Create one-off kickoff job:
+   - Name: `Prompt A (Designer)`
+   - Agent: `main`
+   - Session: `isolated`
+   - Wake mode: `now`
+   - Schedule: run in `5m`
+   - `delete-after-run = true`
+   - `thinking = high`
+   - `timeout-seconds = 1800`
+   - Message payload from file:
+     - `outside-simulator.txt`
+
+2. Create recurring timeout monitor:
+   - Name: `Prompt D (Timeout Monitor)`
+   - Agent: `main`
+   - Session: `isolated`
+   - Wake mode: `now`
+   - Schedule: every `10m`
+   - `thinking = medium`
+   - `timeout-seconds = 1800`
+   - Message payload from file:
+     - `timeout-monitor.txt`
+
+Validation required:
+1. List enabled cron jobs.
+2. Confirm:
+   - Exactly one enabled `Prompt A (Designer)` one-off.
+   - Exactly one enabled `Prompt D (Timeout Monitor)` recurring.
+   - No enabled `Prompt B (Executor)` or `Prompt C (Playtester)` initially.
+3. Print created job IDs and next run times.
+
+Stop.
