@@ -6,6 +6,7 @@ Shared coordination files:
 - `sim/latest.json`
 - `sim/cycles/<cycleId>/spec.json`
 - `sim/cycles/<cycleId>/exec_result.json` (if present)
+- `sim/cycles/<cycleId>/playtest_handoff.txt` (if present, plain-English instructions from Executor)
 
 First, ensure working directory is OpenWorld repo root:
 - `cd openworld` (or equivalent path to the repo root in this environment).
@@ -18,6 +19,11 @@ State transition at start:
 - Set task status to `in_testing`.
 
 Playtest run (required):
+- Read `sim/cycles/<cycleId>/playtest_handoff.txt` first (if present).
+- If handoff exists:
+  - Run the primary command from handoff as first validation run.
+  - Use handoff success signals/caveats as required checks.
+  - Treat handoff as guidance from Executor; you may still use your own judgement and run additional tests to cover behavior properly.
 - Use the working exploration flow as baseline:
   - `./scripts/run-agent-exploration.sh`
 - You may adapt runtime and test script based on what you are validating.

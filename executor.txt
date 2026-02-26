@@ -7,6 +7,7 @@ Shared coordination files:
 - `sim/task_feedback.jsonl`
 - `sim/latest.json`
 - `sim/cycles/<cycleId>/spec.json`
+- `sim/cycles/<cycleId>/playtest_handoff.txt` (plain-English handoff for Playtester)
 
 First, ensure working directory is OpenWorld repo root:
 - `cd openworld` (or equivalent path to the repo root in this environment).
@@ -41,9 +42,36 @@ Execution loop (max 50 spins per run):
 - `sim/tasks/<taskId>/executor_state.json`
 - selected task entry in `sim/task_board.json`
 
+Bridge/agent behavior policy:
+- Default behavior driver is `scripts/agent-exploration-first-steps.mjs`.
+- You may modify `scripts/agent-exploration-first-steps.mjs` to introduce new behavior when it helps the task.
+- If the behavior is too large for incremental edits, you may create a new behavior script using the exploration script as blueprint.
+- New behavior scripts must follow naming:
+  - `scripts/playtest-*.mjs` (or `.cjs` / `.sh` only if necessary).
+- Any new script must remain compatible with:
+  - `./scripts/run-agent-exploration.sh` via `AGENT_SCRIPT=<script path>`.
+
+Executor self-test convention (required before marking implemented):
+- Ensure dev server/bridge path is correctly set up for the test run.
+- If needed, start/verify with OpenWorld conventions before testing:
+  - `VITE_AGENT_BRIDGE_WS_URL=ws://127.0.0.1:8787 npm run dev -- --host 0.0.0.0 --port 5173`
+  - keep browser on `http://127.0.0.1:5173` active/refresh if observations are missing.
+- Run at least one end-to-end self-test command that exercises the implemented behavior.
+- Record the exact self-test command and key evidence in `exec_result.json`.
+
 When done for that task:
 - Set task status to `implemented`.
 - Write/update `sim/cycles/<cycleId>/exec_result.json` with progress summary and changed files.
+- Write/update `sim/cycles/<cycleId>/playtest_handoff.txt` (plain text, no JSON).
+- `playtest_handoff.txt` must include:
+  - Task id and cycle id
+  - What was implemented (short, concrete)
+  - Primary test command Playtester should run
+  - Any required env vars/flags and script path
+  - Expected success signals in logs/events
+  - What Playtester should verify visually
+  - Known caveats/failure modes
+  - Suggested extra tests (optional)
 - Append a short feedback line to `sim/task_feedback.jsonl` (source=`executor`).
 - Schedule ONE isolated one-off `Prompt C (Playtester)` (prompt source `playtester.txt`).
 - Create that cron job with one-off settings explicitly:
