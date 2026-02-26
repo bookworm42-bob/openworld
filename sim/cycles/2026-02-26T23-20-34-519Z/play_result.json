@@ -1,0 +1,30 @@
+{
+  "cycleId": "2026-02-26T23-20-34-519Z",
+  "taskId": "task-2026-02-26T23-20-34-519Z-1",
+  "status": "pass",
+  "summary": "Primary handoff pilgrimage run passed end-to-end with sanctum finale completion and stable control-loop telemetry; supplemental exploration smoke confirmed roam/target baseline behavior.",
+  "runConfig": {
+    "script": "scripts/playtest-beacon-pilgrimage.mjs",
+    "runSec": 180,
+    "captureEverySec": 10
+  },
+  "observations": [
+    "Primary command from handoff executed first with screenshots enabled and reached finale_unlocked -> finale_started -> finale_completed -> quest_completed in one run.",
+    "Connectivity/control checks passed: [OPEN] connected, [OBS] first observation received, continuous [ACT] stream through objective_hint/far/approach/lock modes with lock-attunement transitions.",
+    "Startup-stall regression check passed with [METRIC] startup_no_progress_window_ms=0.",
+    "Visual artifacts were produced and non-blank (00-before-agent.png, 99-after-agent.png; both ~338-340 KB) in artifacts/try-2026-02-26T23-20-34-519Z-task-2026-02-26T23-20-34-519Z-1.",
+    "Supplemental 45s baseline run using scripts/agent-exploration-first-steps.mjs showed both mode=roam and mode=target ACT behavior."
+  ],
+  "metrics": {
+    "runSec": 180,
+    "captureEverySec": 10,
+    "screenshotCount": 2,
+    "obsReceived": true,
+    "actLoopHealthy": true
+  },
+  "issues": [],
+  "nextRecommendations": [
+    "Optional confidence sweep: rerun sanctum finale with ROAM_SEED=505 and ROAM_SEED=606 to confirm cue consistency across seeds.",
+    "Keep periodic screenshot-enabled checks in future cycles to guard visual readability of stage transitions and finale payoff."
+  ]
+}

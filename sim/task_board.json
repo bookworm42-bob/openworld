@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T23:33:30Z",
+  "updatedAt": "2026-02-26T23:37:11Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -49,12 +49,12 @@
       "taskId": "task-2026-02-26T23-20-34-519Z-1",
       "cycleId": "2026-02-26T23-20-34-519Z",
       "title": "Sanctum finale objective with world-state epilogue and bridge-visible quest staging",
-      "status": "implemented",
+      "status": "tested",
       "createdAt": "2026-02-26T23:20:34.519Z",
       "deadlineAt": "2026-02-27T14:20:34.519Z",
-      "owner": "executor",
-      "notes": "Implemented sanctum finale objective with staged quest progression (beacons_active -> sanctum_unlocked -> finale_attuning -> finale_completed), world-state visual grade shifts, sanctum telemetry/events, and updated playtest script; seeded normal+screenshots runs passed to finale completion.",
-      "updatedAt": "2026-02-26T23:33:30Z"
+      "owner": "playtester",
+      "notes": "Playtest pass: primary handoff run (screenshots enabled) reached finale_completed + quest_completed with startup_no_progress_window_ms=0; supplemental baseline smoke confirmed stable roam/target ACT loop.",
+      "updatedAt": "2026-02-26T23:37:11Z"
     }
   ]
 }
