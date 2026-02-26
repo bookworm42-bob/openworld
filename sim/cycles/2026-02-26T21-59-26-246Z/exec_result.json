@@ -1,0 +1,48 @@
+{
+  "taskId": "task-2026-02-26T21-59-26-246Z-1",
+  "cycleId": "2026-02-26T21-59-26-246Z",
+  "status": "implemented",
+  "summary": "Added static world collision registration/solver, collision-aware movement response, bridge nav blockage telemetry/events, and upgraded pilgrimage controller recovery using new nav signals.",
+  "changedFiles": [
+    "src/collision.js",
+    "src/main.js",
+    "src/agentBridge/perception.js",
+    "scripts/playtest-beacon-pilgrimage.mjs",
+    "sim/task_board.json",
+    "sim/tasks/task-2026-02-26T21-59-26-246Z-1/executor_state.json"
+  ],
+  "build": {
+    "command": "npm run build",
+    "result": "pass"
+  },
+  "selfTests": [
+    {
+      "command": "ROAM_SEED=101 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/playtest-seed-101.log:90 [MISSION] quest_completed progress=1",
+        "artifacts/executor/playtest-seed-101.log:49 [NAV] collision_resolved blockedForMs=1457 collider=tower-near"
+      ]
+    },
+    {
+      "command": "ROAM_SEED=202 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/playtest-seed-202.log:79 [MISSION] quest_completed progress=1",
+        "artifacts/executor/playtest-seed-202.log:36 [NAV] collision_resolved blockedForMs=1261 collider=beacon_1"
+      ]
+    },
+    {
+      "command": "ROAM_SEED=303 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/playtest-seed-303.log:79 [MISSION] quest_completed progress=1",
+        "artifacts/executor/playtest-seed-303.log:37 [NAV] collision_resolved blockedForMs=2581 collider=beacon_1"
+      ]
+    }
+  ],
+  "notes": [
+    "OBS remains backward compatible; new nav payload is optional at sensors.nav.",
+    "Collision events emitted as collision / collision_resolved / nav_recovery with collider metadata when available."
+  ]
+}

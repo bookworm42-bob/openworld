@@ -1,0 +1,38 @@
+Task: task-2026-02-26T21-59-26-246Z-1
+Cycle: 2026-02-26T21-59-26-246Z
+
+What was implemented
+- Added static world collision layer for major props/landmarks/beacons (central registry + grid broadphase) in src/collision.js.
+- Wired collider registration at spawn time in src/main.js for trees/rocks/logs/ruin accents, landmarks, and beacons with deterministic collider ids/tags.
+- Player movement now resolves horizontal penetration (slide-style response) against static colliders before final pose commit.
+- Added nav blockage telemetry to OBS as sensors.nav (blocked, frontPressure, recentCollision, blockedForMs) while preserving existing keys.
+- Added bridge events: collision, collision_resolved, nav_recovery (with collider metadata when available).
+- Upgraded scripts/playtest-beacon-pilgrimage.mjs to use nav telemetry for recovery (backoff + arc) and avoid target locking on non-beacon interactables.
+
+Primary test command (Playtester)
+ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh
+
+Required env vars / flags / script path
+- AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs
+- RUN_SEC=180 recommended for full pilgrimage reliability check
+- ROAM_SEED=<seed> (test multiple seeds)
+- run-agent-exploration.sh already sets VITE_AGENT_BRIDGE_WS_URL=ws://127.0.0.1:8787 when launching dev server
+
+Expected success signals (logs/events)
+- [MISSION] objective_completed beacon_1 / beacon_2 / beacon_3
+- [MISSION] quest_completed progress=1
+- [SUCCESS] quest_completed observed; finishing run
+- Optional/expected around obstacles: [NAV] collision..., [NAV] collision_resolved..., [NAV] nav_recovery...
+
+What to verify visually
+- Player no longer clips through trees/rocks/tower/beacons.
+- On obstacle contact, movement glides/slides around geometry instead of teleport jitter.
+- Beacon interactions still occur in sequence and quest can complete.
+
+Known caveats / failure modes
+- Circular collider approximation for complex meshes may be conservative (slightly larger no-go around some props).
+- If browser tab is not active/refreshed, OBS can lag/miss; rerun after forcing tab focus/refresh.
+
+Suggested extra tests
+- Run seeds 101/202/303 (executor baseline) plus one random seed.
+- During run, manually watch tower-near approach to confirm recovery events and no hard lock.

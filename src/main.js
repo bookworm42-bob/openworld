@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AgentBridgeClient } from './agentBridge/client.js';
 import { buildObservation } from './agentBridge/perception.js';
 import { captureFrame } from './agentBridge/capture.js';
+import { StaticWorldColliders, resolvePlayerCylinderMotion } from './collision.js';
 import idleFbxUrl from '../3d_models/boy/SadIdle.fbx?url';
 import walkFbxUrl from '../3d_models/boy/Walking.fbx?url';
 import jumpFbxUrl from '../3d_models/boy/Jumping.fbx?url';
@@ -475,6 +476,24 @@ const bridgeEvents = [];
 let bridgeObsTick = 0;
 let bridgeStuckCounter = 0;
 
+const playerCollider = {
+  radius: 0.42,
+  height: 1.75
+};
+
+const worldColliders = new StaticWorldColliders({ cellSize: 6 });
+let staticColliderSeq = 0;
+
+const collisionRuntime = {
+  blocked: false,
+  blockedSinceMs: 0,
+  blockedForMs: 0,
+  frontPressure: 0,
+  recentCollision: null,
+  recoveryNoted: false,
+  lastCollisionEventAtMs: 0
+};
+
 function clampAxis(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
@@ -488,6 +507,49 @@ function enqueueBridgeEvent(type, extra = {}) {
     ...extra
   });
   if (bridgeEvents.length > 12) bridgeEvents.shift();
+}
+
+function nextColliderId(prefix = 'solid') {
+  staticColliderSeq += 1;
+  return `${prefix}_${String(staticColliderSeq).padStart(3, '0')}`;
+}
+
+function registerStaticColliderForObject(object, {
+  colliderId,
+  colliderTag,
+  radiusScale = 0.5,
+  radiusPadding = 0.12,
+  minRadius = 0.45,
+  maxRadius = 9
+} = {}) {
+  if (!object) return null;
+
+  const id = colliderId
+    || object.userData?.agentId
+    || object.name
+    || nextColliderId(colliderTag || object.userData?.agentTag || 'solid');
+
+  const tag = colliderTag || object.userData?.agentTag || 'solid';
+
+  const collider = worldColliders.registerFromObject({
+    object,
+    id,
+    tag,
+    radiusScale,
+    radiusPadding,
+    minRadius,
+    maxRadius
+  });
+
+  if (!collider) return null;
+
+  object.userData = {
+    ...object.userData,
+    colliderId: collider.id,
+    colliderTag: collider.tag
+  };
+
+  return collider;
 }
 
 function recomputeBridgePerceptionSets() {
@@ -1129,6 +1191,15 @@ async function createLandmarks() {
     mesh.userData.agentTag = landmark.type;
     mesh.userData.agentId = landmark.id;
     scene.add(mesh);
+
+    registerStaticColliderForObject(mesh, {
+      colliderId: landmark.id,
+      colliderTag: landmark.type,
+      radiusScale: landmark.type === 'ruins' ? 0.58 : 0.5,
+      radiusPadding: landmark.type === 'ruins' ? 0.45 : 0.3,
+      minRadius: landmark.type === 'ruins' ? 1.9 : 1.3,
+      maxRadius: landmark.type === 'ruins' ? 4.8 : 4
+    });
   });
 
   markBootStage('landmarksReady', `sceneChildren=${scene.children.length}`);
@@ -1137,6 +1208,7 @@ async function createLandmarks() {
 async function createSetDressing() {
   console.log('[boot-debug] createSetDressing: start');
   let perceivablePropSeq = 0;
+  let staticPropSeq = 0;
   const propAnchors = [
     { x: -6.5, z: -4.2, scale: 1.2 },
     { x: 7.4, z: 4.6, scale: 0.9 },
@@ -1183,12 +1255,18 @@ async function createSetDressing() {
       mesh.position.set(x, getTerrainHeightAt(x, z), z);
       mesh.scale.setScalar(scale);
       mesh.rotation.y = rotation;
+
+      let stableId = `${agentTag}-solid-${String(staticPropSeq).padStart(3, '0')}`;
+      staticPropSeq += 1;
+
       if (perceivable) {
         mesh.userData.agentPerceivable = true;
         mesh.userData.agentTag = agentTag;
-        mesh.userData.agentId = `${agentTag}-${perceivablePropSeq}`;
+        stableId = `${agentTag}-${perceivablePropSeq}`;
+        mesh.userData.agentId = stableId;
         perceivablePropSeq += 1;
       }
+
       mesh.traverse((child) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -1196,6 +1274,15 @@ async function createSetDressing() {
         }
       });
       scene.add(mesh);
+
+      registerStaticColliderForObject(mesh, {
+        colliderId: stableId,
+        colliderTag: agentTag,
+        radiusScale: agentTag === 'tree' ? 0.42 : 0.5,
+        radiusPadding: agentTag === 'tree' ? 0.16 : 0.12,
+        minRadius: agentTag === 'tree' ? 0.55 : 0.48,
+        maxRadius: agentTag === 'tree' ? 1.9 : 1.6
+      });
     };
 
     propAnchors.forEach((anchor, index) => {
@@ -1263,13 +1350,26 @@ async function createSetDressing() {
       fallback.rotation.y = rotation;
       fallback.castShadow = true;
       fallback.receiveShadow = true;
+
+      let stableId = `${agentTag}-solid-${String(staticPropSeq).padStart(3, '0')}`;
+      staticPropSeq += 1;
       if (perceivable) {
         fallback.userData.agentPerceivable = true;
         fallback.userData.agentTag = agentTag;
-        fallback.userData.agentId = `${agentTag}-${perceivablePropSeq}`;
+        stableId = `${agentTag}-${perceivablePropSeq}`;
+        fallback.userData.agentId = stableId;
         perceivablePropSeq += 1;
       }
       scene.add(fallback);
+
+      registerStaticColliderForObject(fallback, {
+        colliderId: stableId,
+        colliderTag: agentTag,
+        radiusScale: 0.5,
+        radiusPadding: 0.1,
+        minRadius: 0.45,
+        maxRadius: 1.2
+      });
     };
 
     propAnchors.forEach((anchor, index) => {
@@ -1343,6 +1443,15 @@ function createBeacon({ id, label, position }) {
   base.userData.agentId = id;
   base.userData.beaconLabel = label;
   scene.add(base);
+
+  registerStaticColliderForObject(base, {
+    colliderId: id,
+    colliderTag: 'beacon',
+    radiusScale: 0.62,
+    radiusPadding: 0.22,
+    minRadius: 0.72,
+    maxRadius: 1.25
+  });
 
   return {
     id,
@@ -1515,6 +1624,8 @@ function createBeaconQuestUi() {
 }
 
 function createBeaconPilgrimageQuest() {
+  worldColliders.clear();
+  staticColliderSeq = 0;
   pilgrimageQuest.beacons = BEACON_LAYOUT.map(createBeacon);
   createBeaconQuestUi();
   startBeaconQuest();
@@ -1761,16 +1872,89 @@ function updatePlayer(delta) {
     lastMoveHeading.applyQuaternion(playerTurnQuat).normalize();
   }
 
+  const startX = player.position.x;
+  const startZ = player.position.z;
+  let desiredX = startX;
+  let desiredZ = startZ;
+
   playerMoveDirection.set(0, 0, 0);
   if (movingForward) {
     playerMoveDirection.copy(lastMoveHeading);
-    player.position.addScaledVector(playerMoveDirection, moveSpeed * forwardInput * delta);
+    desiredX += playerMoveDirection.x * moveSpeed * forwardInput * delta;
+    desiredZ += playerMoveDirection.z * moveSpeed * forwardInput * delta;
 
     if (actions.walk && !jumping) setAction('walk', 0.16);
   } else if (actions.idle && !jumping) {
     setAction('idle', 0.2);
   }
+
+  const playerYMin = player.position.y + 0.05;
+  const playerYMax = playerYMin + playerCollider.height;
+  const nearbyColliders = worldColliders.queryNearby(desiredX, desiredZ, 8.5);
+  const motionResult = resolvePlayerCylinderMotion({
+    startX,
+    startZ,
+    desiredX,
+    desiredZ,
+    playerRadius: playerCollider.radius,
+    playerYMin,
+    playerYMax,
+    colliders: nearbyColliders,
+    iterations: 4
+  });
+
+  player.position.x = motionResult.x;
+  player.position.z = motionResult.z;
   snapPlayerFacingToHeading(lastMoveHeading);
+
+  const nowCollisionMs = performance.now();
+  if (motionResult.contacts.length > 0) {
+    const strongestContact = motionResult.contacts.reduce(
+      (best, contact) => (contact.penetration > best.penetration ? contact : best),
+      motionResult.contacts[0]
+    );
+    collisionRuntime.recentCollision = {
+      colliderId: strongestContact.id || 'solid_unknown',
+      colliderTag: strongestContact.tag || 'solid',
+      at: Number(clock.elapsedTime.toFixed(3))
+    };
+    if (nowCollisionMs - collisionRuntime.lastCollisionEventAtMs > 220) {
+      enqueueBridgeEvent('collision', {
+        colliderId: collisionRuntime.recentCollision.colliderId,
+        colliderTag: collisionRuntime.recentCollision.colliderTag,
+        blockedRatio: Number(motionResult.blockedRatio.toFixed(3))
+      });
+      collisionRuntime.lastCollisionEventAtMs = nowCollisionMs;
+    }
+  }
+
+  collisionRuntime.frontPressure = motionResult.blockedRatio;
+  const collisionBlocked = movingForward && motionResult.blockedRatio > 0.38;
+  if (collisionBlocked) {
+    if (!collisionRuntime.blocked) {
+      collisionRuntime.blocked = true;
+      collisionRuntime.blockedSinceMs = nowCollisionMs;
+      collisionRuntime.blockedForMs = 0;
+      collisionRuntime.recoveryNoted = false;
+    }
+    collisionRuntime.blockedForMs = Math.max(0, nowCollisionMs - collisionRuntime.blockedSinceMs);
+  } else if (collisionRuntime.blocked) {
+    if (collisionRuntime.blockedForMs > 600) {
+      enqueueBridgeEvent('collision_resolved', {
+        blockedForMs: Math.round(collisionRuntime.blockedForMs),
+        colliderId: collisionRuntime.recentCollision?.colliderId || null,
+        colliderTag: collisionRuntime.recentCollision?.colliderTag || null
+      });
+      enqueueBridgeEvent('nav_recovery', {
+        reason: 'collision_cleared',
+        blockedForMs: Math.round(collisionRuntime.blockedForMs)
+      });
+    }
+    collisionRuntime.blocked = false;
+    collisionRuntime.blockedSinceMs = 0;
+    collisionRuntime.blockedForMs = 0;
+    collisionRuntime.recoveryNoted = true;
+  }
 
   const terrainY = getTerrainHeightAt(player.position.x, player.position.z);
 
@@ -1841,6 +2025,12 @@ function updateBridge(nowMs) {
       grounded: !jumping,
       heading: lastMoveHeading,
       stuck: bridgeStuckCounter > 8,
+      nav: {
+        blocked: collisionRuntime.blocked,
+        frontPressure: collisionRuntime.frontPressure,
+        recentCollision: collisionRuntime.recentCollision,
+        blockedForMs: collisionRuntime.blocked ? collisionRuntime.blockedForMs : 0
+      },
       events: bridgeEvents.splice(0, bridgeEvents.length),
       objective: getObjectiveSnapshot(),
       perceivableRoots: bridgePerceivableRoots,

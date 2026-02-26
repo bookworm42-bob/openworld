@@ -9,6 +9,10 @@ const ACT_INTERVAL_MS = Math.max(20, Math.round(1000 / Math.max(1, ACT_HZ)));
 const TARGET_ARRIVAL_DIST = Number(process.env.TARGET_ARRIVAL_DIST || 2.55);
 const TARGET_STALL_MS = Number(process.env.TARGET_STALL_MS || 7000);
 const RECOVERY_TIMEOUT_MS = Number(process.env.RECOVERY_TIMEOUT_MS || 5500);
+const NAV_BLOCKED_MS = Number(process.env.NAV_BLOCKED_MS || 1700);
+const NAV_PRESSURE_THRESHOLD = Number(process.env.NAV_PRESSURE_THRESHOLD || 0.62);
+const RECOVERY_BACKOFF_MS = Number(process.env.RECOVERY_BACKOFF_MS || 900);
+const RECOVERY_ARC_MS = Number(process.env.RECOVERY_ARC_MS || 1300);
 const CAPTURE_ENABLED = process.env.CAPTURE_ENABLED !== '0';
 const CAPTURE_EVERY_SEC = Number(process.env.CAPTURE_EVERY_SEC || 18);
 const CAPTURE_W = Number(process.env.CAPTURE_W || 1280);
@@ -37,6 +41,10 @@ let roamNoise = 0;
 let captureIndex = 0;
 let capturePending = false;
 let nextCaptureAtSec = Math.max(1, CAPTURE_EVERY_SEC);
+let recoveryMode = null;
+let recoveryUntilMs = 0;
+let recoveryTurnSign = 1;
+let lastRecoveryAt = 0;
 
 const RNG_SEED = Number(process.env.ROAM_SEED || Date.now());
 let rngState = (RNG_SEED >>> 0) || 1;
@@ -99,7 +107,11 @@ function targetFromObjective(obs) {
   const objective = obs?.objective || null;
   const activeId = objective?.activeObjectiveId || null;
   const perceived = Array.isArray(obs?.perceived) ? obs.perceived : [];
-  const perceivedBeacons = perceived.filter((p) => p?.id && (p.tag === 'beacon' || (Array.isArray(p.aff) && p.aff.includes('interact'))));
+  const perceivedBeacons = perceived.filter((p) => {
+    if (!p?.id) return false;
+    if (p.tag === 'beacon') return true;
+    return /^beacon_/i.test(String(p.id));
+  });
 
   if (activeId) {
     const activeTarget = perceivedBeacons.find((p) => p.id === activeId);
@@ -139,13 +151,68 @@ function chooseRoam(ray, nowMs, forced = false) {
   roamUntilMs = nowMs + randRange(1200, 3400);
 }
 
+function beginRecovery(nowMs, targetId = null, reason = 'unknown', nav = null) {
+  const shouldFlip = nav?.recentCollision?.colliderTag === 'tree' || nav?.recentCollision?.colliderTag === 'rock';
+  recoveryTurnSign = shouldFlip ? -Math.sign(recoveryTurnSign || 1) : (rand01() > 0.5 ? 1 : -1);
+  recoveryMode = 'backoff';
+  recoveryUntilMs = nowMs + RECOVERY_BACKOFF_MS;
+  lastRecoveryAt = nowMs;
+  currentTargetId = null;
+  chooseRoam(latestObs?.sensors?.ray || {}, nowMs, true);
+  console.log(`[RECOVERY] mode=backoff target=${targetId || 'none'} reason=${reason} collider=${nav?.recentCollision?.colliderId || 'none'} pressure=${safeNum(nav?.frontPressure, 0).toFixed(2)}`);
+}
+
+function buildRecoveryAct(nowMs) {
+  if (!recoveryMode) return null;
+
+  if (nowMs >= recoveryUntilMs) {
+    if (recoveryMode === 'backoff') {
+      recoveryMode = 'arc';
+      recoveryUntilMs = nowMs + RECOVERY_ARC_MS;
+    } else {
+      recoveryMode = null;
+      return null;
+    }
+  }
+
+  if (recoveryMode === 'backoff') {
+    return {
+      mode: 'recovery_backoff',
+      targetId: null,
+      targetDist: NaN,
+      targetBearing: NaN,
+      forward: -0.42,
+      strafe: 0,
+      turn: clamp1(0.55 * recoveryTurnSign),
+      jump: false,
+      interact: false
+    };
+  }
+
+  return {
+    mode: 'recovery_arc',
+    targetId: null,
+    targetDist: NaN,
+    targetBearing: NaN,
+    forward: 0.5,
+    strafe: 0,
+    turn: clamp1(0.78 * recoveryTurnSign),
+    jump: false,
+    interact: false
+  };
+}
+
 function buildAct(obs) {
   const nowMs = Date.now();
   const ray = obs?.sensors?.ray || {};
+  const nav = obs?.sensors?.nav || null;
   const front = safeNum(ray.front, 99);
   const left = safeNum(ray.frontLeft, 99);
   const right = safeNum(ray.frontRight, 99);
   const stuck = Boolean(obs?.sensors?.stuck);
+
+  const activeRecovery = buildRecoveryAct(nowMs);
+  if (activeRecovery) return activeRecovery;
 
   const target = targetFromObjective(obs);
   if (target) {
@@ -170,14 +237,20 @@ function buildAct(obs) {
     const readyToInteract = dist <= TARGET_ARRIVAL_DIST && Math.abs(bearing) < 0.24 && nowMs - lastInteractAt > 1800;
     const stalled = nowMs - lastTargetProgressAt > TARGET_STALL_MS;
     const timedOut = nowMs - targetLockStartedAt > RECOVERY_TIMEOUT_MS * 2;
+    const navBlocked = Boolean(nav?.blocked)
+      && safeNum(nav?.blockedForMs, 0) >= NAV_BLOCKED_MS
+      && safeNum(nav?.frontPressure, 0) >= NAV_PRESSURE_THRESHOLD;
 
     const interact = readyToInteract;
     if (interact) lastInteractAt = nowMs;
 
-    if (stalled || timedOut) {
-      currentTargetId = null;
-      chooseRoam(ray, nowMs, true);
-      console.log(`[RECOVERY] target=${target.id} stalled=${stalled} timedOut=${timedOut}`);
+    if (stalled || timedOut || navBlocked) {
+      beginRecovery(
+        nowMs,
+        target.id,
+        stalled ? 'target_stalled' : timedOut ? 'target_timeout' : 'nav_blocked',
+        nav
+      );
     }
 
     return {
@@ -356,6 +429,15 @@ ws.addEventListener('message', (event) => {
       if (ev.type === 'quest_completed') {
         questCompleted = true;
         console.log(`[MISSION] quest_completed progress=${ev.progress ?? 'n/a'}`);
+      }
+      if (ev.type === 'collision') {
+        console.log(`[NAV] collision collider=${ev.colliderId || 'unknown'} tag=${ev.colliderTag || 'unknown'} blockedRatio=${ev.blockedRatio ?? 'n/a'}`);
+      }
+      if (ev.type === 'collision_resolved') {
+        console.log(`[NAV] collision_resolved blockedForMs=${ev.blockedForMs ?? 'n/a'} collider=${ev.colliderId || 'unknown'}`);
+      }
+      if (ev.type === 'nav_recovery') {
+        console.log(`[NAV] nav_recovery reason=${ev.reason || 'unknown'} blockedForMs=${ev.blockedForMs ?? 'n/a'}`);
       }
     }
     return;

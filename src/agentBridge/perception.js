@@ -175,6 +175,7 @@ export function buildObservation({
   grounded,
   heading,
   stuck,
+  nav,
   events,
   objective,
   perceivableRoots,
@@ -210,15 +211,26 @@ export function buildObservation({
     };
   }
 
+  const sensorPayload = {
+    ray: sensors,
+    stuck: Boolean(stuck)
+  };
+
+  if (nav && typeof nav === 'object') {
+    sensorPayload.nav = {
+      blocked: Boolean(nav.blocked),
+      frontPressure: Number.isFinite(nav.frontPressure) ? Number(nav.frontPressure.toFixed(3)) : 0,
+      recentCollision: nav.recentCollision || null,
+      blockedForMs: Number.isFinite(nav.blockedForMs) ? Math.max(0, Math.round(nav.blockedForMs)) : 0
+    };
+  }
+
   return {
     type: 'OBS',
     t: Number(nowSeconds.toFixed(3)),
     tick,
     self,
-    sensors: {
-      ray: sensors,
-      stuck: Boolean(stuck)
-    },
+    sensors: sensorPayload,
     objective: objective || null,
     perceived,
     events

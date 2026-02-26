@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T21:59:26.246Z",
+  "updatedAt": "2026-02-26T22:09:15.972Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -16,11 +16,12 @@
       "taskId": "task-2026-02-26T21-59-26-246Z-1",
       "cycleId": "2026-02-26T21-59-26-246Z",
       "title": "Solid-world collision and collision-aware pilgrimage navigation",
-      "status": "proposed",
+      "status": "implemented",
       "createdAt": "2026-02-26T21:59:26.246Z",
       "deadlineAt": "2026-02-27T12:59:26.246Z",
-      "owner": "designer",
-      "notes": "Cycle opened: implement static collision physics + collision-aware agent recovery for beacon quest reliability."
+      "owner": "executor",
+      "notes": "Implemented static world collisions, collision telemetry in OBS/events, and collision-aware pilgrimage playtest behavior. Executor self-tests passed across ROAM_SEED=101/202/303.",
+      "updatedAt": "2026-02-26T22:09:15.972Z"
     }
   ]
 }
