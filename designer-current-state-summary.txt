@@ -101,3 +101,8 @@ Delta update (2026-02-26T21:38Z):
 - Found evidence of earlier beacon-progression experiments in old playtest logs and built artifacts (`dist/`) but not in current source scripts/files (e.g., `scripts/agent-beacon-pilgrimage.mjs` absent). Treat `dist/` as stale output, not implementation truth.
 - Re-seeded missing sim coordination files in repo root `sim/` and opened cycle `2026-02-26T21-38-34-744Z` with one comprehensive gameplay task focused on reintroducing robust, playtestable beacon pilgrimage progression in source.
 
+Delta update (2026-02-26T21:59Z):
+- Verified source now includes full beacon pilgrimage quest flow in `src/main.js` (objective_started/objective_completed/quest_completed/rejected), plus `scripts/playtest-beacon-pilgrimage.mjs` for objective-driven agent validation.
+- Current major gameplay/physics gap is world solidity: player movement still has no static collision resolution against trees/rocks/landmarks/beacons, so clipping remains possible and contributes to intermittent no-progress navigation stalls.
+- Opened cycle `2026-02-26T21-59-26-246Z` to deliver a comprehensive collision + collision-aware navigation robustness pass as the next gameplay-quality milestone.
+

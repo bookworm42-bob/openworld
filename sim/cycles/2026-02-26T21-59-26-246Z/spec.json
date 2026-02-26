@@ -1,0 +1,31 @@
+{
+  "cycleId": "2026-02-26T21-59-26-246Z",
+  "vision": "OpenWorld feels physically coherent: trees, rocks, ruins, landmarks, and beacons are solid world objects, player movement no longer clips through props, and the beacon pilgrimage remains reliably completable with collision-aware navigation.",
+  "objectives": [
+    "Implement a lightweight static-collision gameplay layer so the player capsule cannot pass through major world geometry (set dressing, landmarks, ruins, and beacons).",
+    "Preserve movement quality while adding collision response: smooth slide-along-surface behavior, stable jump/landing on terrain, and no visible jitter/teleport when contacting obstacles.",
+    "Expose navigation-blockage signals to the bridge OBS payload/events so agent controllers can detect and recover from repeated collision stalls.",
+    "Upgrade pilgrimage playtest behavior to be collision-aware and verify end-to-end quest completion robustness across multiple seeds within the 180s budget."
+  ],
+  "implementationHints": [
+    "Prefer a deterministic custom solver (capsule-vs-simple-shapes) over introducing a full physics engine dependency in this cycle.",
+    "Centralize collider registration at spawn time (beacons, trees, rocks, logs, ruins, landmarks) with stable collider ids/tags so bridge telemetry can reference them.",
+    "Keep OBS backward compatible: add new optional fields/events rather than changing existing keys used by current scripts."
+  ],
+  "implementationDetails": [
+    "Gameplay physics pass in src/main.js (or extracted helper module): add a player collider representation and a static world collider registry. Supported primitives may be sphere/cylinder/AABB as long as all key props are covered. Resolve horizontal penetration iteratively each frame and project movement to slide tangentially along blocking geometry.",
+    "Collision authoring: when spawning set dressing/landmarks/beacons, register colliders with deterministic ids linked to object userData.agentId/agentTag where available. Include radius/half-extents metadata and a fast broadphase (distance/grid) to avoid O(N^2) checks.",
+    "Movement integration: preserve existing tank controls and jump feel, but apply collision resolution before final pose commit. Ensure gravity and terrain grounding still behave correctly when near colliders (no sink, no pop, no perpetual airborne state).",
+    "Bridge telemetry contract: include navigation blockage context in OBS (for example sensors.nav with blocked/frontPressure/recentCollision) and emit collision-related events (e.g., collision, collision_resolved, nav_recovery) with colliderId/colliderTag when relevant. Do not remove existing objective/perceived/event semantics.",
+    "Controller upgrade: update scripts/playtest-beacon-pilgrimage.mjs to read new telemetry and perform stronger recovery (back-off + re-approach arc + re-lock objective) when repeated collisions/no-progress is detected. Maintain compatibility with run-agent-exploration.sh via AGENT_SCRIPT=...",
+    "Validation before handoff: npm run build passes; run at least 3 pilgrimage playtests with different ROAM_SEED values (45-180s each) and record quest_completed in all runs without prolonged (>8s) zero-progress lock. Include exact commands and key evidence lines in exec_result.json.",
+    "Visual/playtest verification criteria: captures should show character respecting physical boundaries around props/beacons (no obvious clipping through trunks/rocks/towers) while still reaching and attuning all three beacons in sequence.",
+    "Failure handling: if collision telemetry is unavailable in some frames, controller must gracefully fallback to existing objective/perception steering. If collisions prevent direct path, controller must switch to search/re-approach rather than spamming interact in place."
+  ],
+  "taskId": "task-2026-02-26T21-59-26-246Z-1",
+  "playtest": {
+    "type": "agent",
+    "durationSec": 180,
+    "capture": true
+  }
+}
