@@ -1,0 +1,32 @@
+{
+  "cycleId": "2026-02-26T23-44-19-565Z",
+  "vision": "Pilgrimage flow feels brisk and intentional: each attunement handoff immediately points the player toward the next destination with readable world-space route cues, objective lock-to-attune delays no longer linger, and seeded runs show stable completion pacing instead of long dead-time moments.",
+  "objectives": [
+    "Introduce stage-aware waypoint guidance between objectives (beacon-to-beacon and beacon_3-to-sanctum) so players can read direction in-world without relying on logs.",
+    "Improve objective handoff pacing after each attunement: reduce linger around completed objectives, prevent immediate collision ping-pong, and make next-target acquisition feel immediate.",
+    "Add clearer destination readability in the HUD/bridge contract (e.g., route hint bearing/distance and split timing) while keeping existing objective fields backward compatible.",
+    "Upgrade pilgrimage playtest behavior to exploit route hints when direct perception drops, improving long-distance steering consistency.",
+    "Validate with a multi-seed run set (including screenshot-enabled mode) that finale completion remains deterministic and objective split pacing stays within defined thresholds."
+  ],
+  "implementationHints": [
+    "Treat this as one cohesive pacing/readability pass spanning world cues + interaction flow + bridge telemetry + controller behavior updates.",
+    "Prefer lightweight procedural meshes/material pulses for route cues; avoid heavy new asset imports for this cycle.",
+    "Keep objective snapshot additions additive/optional so existing consumers of guidance/dist/bearing do not break."
+  ],
+  "implementationDetails": [
+    "In src/main.js, author a deterministic waypoint-route layer for each active objective stage (spawn->beacon_1, beacon_1->beacon_2, beacon_2->beacon_3, beacon_3->sanctum_core). Show only the active leg with clear in-world breadcrumbs (e.g., low beacon pips/path rings) that are visible in screenshots and fade when objective changes.",
+    "Add handoff smoothing after objective completion: brief post-attune egress behavior (or temporary collider easing around the just-completed objective) so movement does not repeatedly collide with the completed beacon/sanctum during transition to the next leg.",
+    "Expose route-hint metadata in objective snapshot payload (additive fields only), such as routeHintDist, routeHintBearing, routeHintId/Index, objectiveSplitSec, and questElapsedSec; preserve existing guidance + activeObjective* fields.",
+    "Emit pacing telemetry events for verification: objective_handoff_started/objective_handoff_settled (or equivalent) and objective_split metrics including lockToAttuneMs per objective.",
+    "Update scripts/playtest-beacon-pilgrimage.mjs to consume the new route hints when target perception is weak/occluded, while maintaining fallback behavior if hint fields are absent.",
+    "Add pass/fail pacing assertions in playtest script/logs: for seeded runs, each objective should avoid prolonged lock-to-attune dead-time (target <= 2500ms) and total finale completion should stay inside RUN_SEC budget with no startup stall regressions.",
+    "Validation before handoff: npm run build passes; run at least three seeded pilgrimage runs (ROAM_SEED=404, 505, 606) with AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs plus one screenshot-enabled run on isolated DEV_PORT/BRIDGE_PORT pairs.",
+    "Record evidence in exec_result.json and playtest_handoff.txt: commands, per-objective split/lock metrics, any collision-reduction evidence around handoffs, and screenshot paths showing route cues + destination readability."
+  ],
+  "taskId": "task-2026-02-26T23-44-19-565Z-1",
+  "playtest": {
+    "type": "agent",
+    "durationSec": 180,
+    "capture": true
+  }
+}
