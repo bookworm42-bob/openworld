@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T22:43:39.733Z",
+  "updatedAt": "2026-02-26T22:49:42.336Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -27,12 +27,12 @@
       "taskId": "task-2026-02-26T22-30-52-343Z-1",
       "cycleId": "2026-02-26T22-30-52-343Z",
       "title": "Beacon attunement encounter polish (lock-on approach + progression feedback)",
-      "status": "implemented",
+      "status": "tested",
       "createdAt": "2026-02-26T22:30:52.343Z",
       "deadlineAt": "2026-02-27T13:30:52.343Z",
-      "owner": "executor",
-      "notes": "Shipped lock-aware beacon approach/attunement polish, HUD/cue feedback, objective lock telemetry/events, and lock-aware pilgrimage controller; seeded self-tests 101/202/303/404 + screenshot run passed.",
-      "updatedAt": "2026-02-26T22:43:39.733Z"
+      "owner": "playtester",
+      "notes": "Playtest pass after rerun: ROAM_SEED=404 pilgrimage run reached quest_completed with lock/attunement signals and max_in_range_hesitation_ms=157; one intermittent startup stall observed in primary screenshot-enabled run.",
+      "updatedAt": "2026-02-26T22:49:42.336Z"
     }
   ]
 }
