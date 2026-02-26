@@ -65,7 +65,7 @@ function classifySize(root) {
 
 function getAffordances(tag) {
   if (tag === 'npc') return ['talk'];
-  if (tag === 'beacon' || tag === 'tower') return ['interact'];
+  if (tag === 'beacon' || tag === 'sanctum' || tag === 'tower') return ['interact'];
   return ['none'];
 }
 

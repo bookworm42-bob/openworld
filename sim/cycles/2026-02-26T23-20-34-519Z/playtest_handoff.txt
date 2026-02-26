@@ -1,0 +1,54 @@
+Task: task-2026-02-26T23-20-34-519Z-1
+Cycle: 2026-02-26T23-20-34-519Z
+
+Implemented
+- Extended pilgrimage flow into explicit quest stages:
+  - beacons_active -> sanctum_unlocked -> finale_attuning -> finale_completed
+- Added new finale objective interactable `sanctum_core` (agentPerceivable tag `sanctum`) with deterministic id/collider and lock-aware attunement gating.
+- Added world-space finale guidance signals at sanctum unlock/completion:
+  - sanctum beam + cue ring + path marker pulse
+  - objective/status cue banner updates
+- Added stage-driven world grade transitions (fog/background/lighting/exposure) tied to progression while preserving readability.
+- Extended objective snapshot payload (backward compatible) with:
+  - questStage, finaleObjectiveId, finaleUnlocked, finaleCompleted, finaleProgress
+  - activeObjectiveDist/activeObjectiveBearing (legacy activeBeacon* kept)
+- Emitted finale telemetry events for assertions:
+  - finale_unlocked, finale_started, finale_completed
+- Updated playtest agent script to:
+  - target sanctum objective correctly
+  - assert finale completion (with quest_completed compatibility fallback)
+  - log finale stage transitions explicitly.
+
+Primary playtest command
+DEV_PORT=5185 BRIDGE_PORT=8805 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T23-20-34-519Z-task-2026-02-26T23-20-34-519Z-1 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh
+
+Required env/flags/script path
+- AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs
+- Use isolated port pair per run (DEV_PORT / BRIDGE_PORT)
+- Screenshot run uses observer snapshot bridge mode automatically via harness
+- Optional: CAPTURE_ENABLED=0 as above for deterministic log-only validation
+
+Expected success signals in logs/events
+- [MISSION] finale_unlocked objective=sanctum_core ...
+- [MISSION] finale_started objective=sanctum_core ...
+- [MISSION] finale_completed objective=sanctum_core ...
+- [MISSION] quest_completed progress=1
+- [METRIC] startup_no_progress_window_ms=0
+- Screenshot mode:
+  - [SNAPSHOT] bridge_mode=observer ...
+  - [SNAPSHOT] saved .../00-before-agent.png
+  - [SNAPSHOT] saved .../99-after-agent.png
+
+What Playtester should verify visually
+- After beacon_3 attunes, sanctum objective visibly unlocks (new beam/cue/path marker near sanctum area).
+- Objective HUD switches from beacon progression to finale instruction text.
+- Finale completion creates obvious sanctum-emissive payoff and completion banner.
+- Before/after screenshots show stage change and finale endpoint cues.
+
+Known caveats/failure modes
+- If stale manual clients are connected on same bridge/dev ports, control ownership can become noisy; isolated ports avoid this.
+- Sanctum approach relies on lock alignment near ~2.5m; extreme collision pressure from external scene edits could increase recovery cycles.
+
+Suggested extra tests
+- Seed sweep with screenshots (e.g., ROAM_SEED=404, 505, 606) to validate deterministic sanctum unlock timing and visual cue consistency.
+- Long-run smoke with CAPTURE_ENABLED=1 to inspect stage readability across captures and verify finale telemetry remains ordered.

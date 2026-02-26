@@ -1,0 +1,48 @@
+{
+  "taskId": "task-2026-02-26T23-20-34-519Z-1",
+  "cycleId": "2026-02-26T23-20-34-519Z",
+  "status": "implemented",
+  "summary": "Extended beacon pilgrimage into a sanctum finale with explicit quest stages, sanctum world objective/visual guidance, world-state grade transitions, and finale telemetry/events surfaced in objective snapshots and logs.",
+  "changedFiles": [
+    "src/main.js",
+    "src/agentBridge/perception.js",
+    "scripts/playtest-beacon-pilgrimage.mjs",
+    "sim/task_board.json",
+    "sim/tasks/task-2026-02-26T23-20-34-519Z-1/executor_state.json",
+    "sim/cycles/2026-02-26T23-20-34-519Z/exec_result.json",
+    "sim/cycles/2026-02-26T23-20-34-519Z/playtest_handoff.txt"
+  ],
+  "build": {
+    "command": "npm run build",
+    "result": "pass"
+  },
+  "selfTests": [
+    {
+      "command": "DEV_PORT=5184 BRIDGE_PORT=8804 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T23-20-34-519Z/playtest-seed-404-rerun.log:82 [MISSION] finale_unlocked objective=sanctum_core progress=0.75",
+        "artifacts/executor/2026-02-26T23-20-34-519Z/playtest-seed-404-rerun.log:104 [MISSION] finale_started objective=sanctum_core dist=2.26 lockStableMs=488",
+        "artifacts/executor/2026-02-26T23-20-34-519Z/playtest-seed-404-rerun.log:107 [MISSION] finale_completed objective=sanctum_core progress=1",
+        "artifacts/executor/2026-02-26T23-20-34-519Z/playtest-seed-404-rerun.log:110 [METRIC] startup_no_progress_window_ms=0"
+      ]
+    },
+    {
+      "command": "DEV_PORT=5185 BRIDGE_PORT=8805 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T23-20-34-519Z-task-2026-02-26T23-20-34-519Z-1 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T23-20-34-519Z/playtest-seed-404-shots.log:14 [SNAPSHOT] bridge_mode=observer label=snapshot-before-...",
+        "artifacts/executor/2026-02-26T23-20-34-519Z/playtest-seed-404-shots.log:79 [MISSION] finale_unlocked objective=sanctum_core progress=0.75",
+        "artifacts/executor/2026-02-26T23-20-34-519Z/playtest-seed-404-shots.log:104 [MISSION] finale_completed objective=sanctum_core progress=1",
+        "artifacts/executor/2026-02-26T23-20-34-519Z/playtest-seed-404-shots.log:110 [SNAPSHOT] saved .../99-after-agent.png"
+      ]
+    }
+  ],
+  "notes": [
+    "Quest progression now stages through beacons_active -> sanctum_unlocked -> finale_attuning -> finale_completed and only emits quest_completed after sanctum attunement.",
+    "Added sanctum_core interactable objective with deterministic id/tag, collider registration, lock-on attunement gating, cue ring/beam/path marker signals, and finale-specific status messaging.",
+    "Objective snapshot remains backward compatible while adding questStage/finaleObjectiveId/finaleUnlocked/finaleCompleted/finaleProgress and activeObjective distance/bearing metadata.",
+    "Finale telemetry events emitted for automation assertions: finale_unlocked, finale_started, finale_completed (alongside existing objective/quest events).",
+    "Playtest script now handles sanctum objective targeting and validates finale completion with fallback compatibility for quest_completed-only payloads."
+  ]
+}

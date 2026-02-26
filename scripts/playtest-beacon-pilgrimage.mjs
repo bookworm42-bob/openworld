@@ -33,6 +33,7 @@ let actTimer = null;
 let shutdownTimer = null;
 let runStartedAtMs = 0;
 let questCompleted = false;
+let finaleCompleted = false;
 let completedObjectives = new Set();
 let currentTargetId = null;
 let targetLockStartedAt = 0;
@@ -121,18 +122,19 @@ function targetFromObjective(obs) {
   const objective = obs?.objective || null;
   const activeId = objective?.activeObjectiveId || null;
   const perceived = Array.isArray(obs?.perceived) ? obs.perceived : [];
-  const perceivedBeacons = perceived.filter((p) => {
+  const objectiveCandidates = perceived.filter((p) => {
     if (!p?.id) return false;
-    if (p.tag === 'beacon') return true;
-    return /^beacon_/i.test(String(p.id));
+    if (p.id === activeId) return true;
+    if (p.tag === 'beacon' || p.tag === 'sanctum') return true;
+    return /^beacon_/i.test(String(p.id)) || /sanctum/i.test(String(p.id));
   });
 
   if (activeId) {
-    const activeTarget = perceivedBeacons.find((p) => p.id === activeId);
+    const activeTarget = objectiveCandidates.find((p) => p.id === activeId);
     if (activeTarget) return activeTarget;
   }
 
-  const fallback = perceivedBeacons
+  const fallback = objectiveCandidates
     .filter((p) => !completedObjectives.has(p.id))
     .sort((a, b) => safeNum(a.dist, 999) - safeNum(b.dist, 999))[0];
 
@@ -415,7 +417,7 @@ function startActLoop() {
       return;
     }
 
-    if (!startupStallFailed && startupTrackedSinceMs > 0 && startupActSeqSeen > 0 && !questCompleted) {
+    if (!startupStallFailed && startupTrackedSinceMs > 0 && startupActSeqSeen > 0 && !questCompleted && !finaleCompleted) {
       const stalledForMs = Date.now() - startupTrackedSinceMs;
       if (stalledForMs >= STARTUP_NO_PROGRESS_MS) {
         startupStallFailed = true;
@@ -427,18 +429,18 @@ function startActLoop() {
       }
     }
 
-    if (questCompleted) {
+    if (finaleCompleted || questCompleted) {
       const startupTrackedForMs = startupTrackedSinceMs > 0 ? Date.now() - startupTrackedSinceMs : 0;
       console.log(`[METRIC] max_in_range_hesitation_ms=${Math.round(maxInRangeHesitationMs)}`);
       console.log(`[METRIC] startup_no_progress_window_ms=${Math.round(startupTrackedForMs)}`);
-      console.log('[SUCCESS] quest_completed observed; finishing run');
+      console.log('[SUCCESS] finale completion observed; finishing run');
       stop(0);
     }
   }, ACT_INTERVAL_MS);
 
   shutdownTimer = setTimeout(() => {
-    if (!questCompleted) {
-      console.error(`[FAIL] RUN_SEC reached (${RUN_SEC}s) without quest_completed`);
+    if (!finaleCompleted && !questCompleted) {
+      console.error(`[FAIL] RUN_SEC reached (${RUN_SEC}s) without finale completion`);
       stop(2);
       return;
     }
@@ -487,6 +489,9 @@ ws.addEventListener('message', (event) => {
     }
 
     const objective = msg.objective || {};
+    if (objective?.finaleCompleted === true || objective?.questStage === 'finale_completed') {
+      finaleCompleted = true;
+    }
     const guidance = objective.guidance || null;
     const trackedObjectiveId = objective.activeObjectiveId || null;
     const trackedDist = safeNum(guidance?.dist, NaN);
@@ -495,7 +500,7 @@ ws.addEventListener('message', (event) => {
       && trackedDist >= STARTUP_NO_PROGRESS_MIN_DIST
       && lockStableMs <= 200;
 
-    if (startupActSeqSeen > 0 && shouldTrackStartup && !questCompleted) {
+    if (startupActSeqSeen > 0 && shouldTrackStartup && !questCompleted && !finaleCompleted) {
       const now = Date.now();
       if (trackedObjectiveId !== startupTrackedObjectiveId || !Number.isFinite(startupTrackedDist)) {
         startupTrackedObjectiveId = trackedObjectiveId;
@@ -535,6 +540,17 @@ ws.addEventListener('message', (event) => {
       if (ev.type === 'attunement_started') {
         inRangeSinceMs = 0;
         console.log(`[LOCK] attunement_started objective=${ev.objectiveId || 'unknown'} lockStableMs=${ev.lockStableMs ?? 'n/a'}`);
+      }
+      if (ev.type === 'finale_unlocked') {
+        console.log(`[MISSION] finale_unlocked objective=${ev.objectiveId || 'unknown'} progress=${ev.progress ?? 'n/a'}`);
+      }
+      if (ev.type === 'finale_started') {
+        console.log(`[MISSION] finale_started objective=${ev.objectiveId || 'unknown'} dist=${ev.activeObjectiveDist ?? 'n/a'} lockStableMs=${ev.lockStableMs ?? 'n/a'}`);
+      }
+      if (ev.type === 'finale_completed') {
+        finaleCompleted = true;
+        if (ev.objectiveId) completedObjectives.add(ev.objectiveId);
+        console.log(`[MISSION] finale_completed objective=${ev.objectiveId || 'unknown'} progress=${ev.progress ?? 'n/a'}`);
       }
       if (ev.type === 'rejected') {
         console.log(`[MISSION] rejected objective=${ev.objectiveId || 'unknown'} expected=${ev.expectedObjectiveId || 'unknown'}`);
