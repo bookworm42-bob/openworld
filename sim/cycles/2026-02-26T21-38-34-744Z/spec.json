@@ -1,0 +1,31 @@
+{
+  "cycleId": "2026-02-26T21-38-34-744Z",
+  "vision": "The world feels like a directed micro-adventure instead of a sandbox: the player/agent can discover, attune, and complete a three-step beacon pilgrimage with clear in-world guidance, readable feedback, and a visible completion beat.",
+  "objectives": [
+    "Add a 3-stage beacon pilgrimage quest where only one beacon is active at a time and progression requires physically reaching and interacting in sequence.",
+    "Expose quest state through the bridge OBS payload (objective id, phase, completion progress) and interaction events so agent behavior can track progression without dev-only god-mode assumptions.",
+    "Improve navigation/readability by adding strong visual guidance for active vs inactive beacons (beam, emissive pulse, or equivalent) and concise HUD prompts/status feedback.",
+    "Provide a dedicated playtest controller script that can complete the pilgrimage in realistic mode (no required self.pos), with robust retarget/recovery behavior and meaningful logs."
+  ],
+  "implementationHints": [
+    "Keep quest orchestration in a focused state container (e.g., quest manager object/module) invoked from main update loop; avoid scattering progression booleans globally.",
+    "Use existing perceivable tagging to make beacons discoverable by the bridge and keep IDs deterministic (beacon_1..beacon_3).",
+    "Controller should prioritize active objective beacon when perceived, otherwise roam with obstacle-aware search until reacquired."
+  ],
+  "implementationDetails": [
+    "World/gameplay loop: add three beacon entities placed across distinct landmarks/chunks; each beacon must support inactive, active, and completed visual states. Interaction should only advance when interacting with the current active objective; out-of-order interactions return explicit rejection feedback.",
+    "Quest state/data shape: maintain questId, phase (intro|beacon_1|beacon_2|beacon_3|completed), activeObjectiveId, completedObjectiveIds[], progress [0..1], and recent quest events. Drain events into bridge event stream similarly to existing interaction events.",
+    "Bridge/OBS contract: include objective snapshot under OBS (e.g., objective field) with stable keys, and emit event types that allow playtest scripts to confirm advancement (objective_started/objective_completed/quest_completed/rejected). Keep backward compatibility for existing consumers.",
+    "Interaction UX: update on-screen prompt text contextually (approach/attune/out-of-order), show short status toasts, and show compact objective HUD plus a temporary completion banner or world pulse when quest completes.",
+    "Agent playtest behavior: create scripts/agent-beacon-pilgrimage.mjs (or scripts/playtest-*.mjs) that reads objective + perceived data, drives toward active beacon, triggers INTERACT near target, detects stalls, recovers with roam/search, and logs mission step transitions.",
+    "Runner compatibility: ensure ./scripts/run-agent-exploration.sh can run the new controller via AGENT_SCRIPT=... and document required env vars. Do not regress default exploration script behavior.",
+    "Validation criteria before handoff: npm run build passes; at least one end-to-end run reaches quest_completed within <=180s in realistic mode; captures show multiple beacon states over time; logs contain objective progression and at least one successful interaction at each stage.",
+    "Failure handling: if objective data is temporarily missing in OBS, controller should degrade gracefully to perception-only targeting (no hard lock). If beacon not perceived for prolonged period, re-enter roam recovery and reacquire without freezing."
+  ],
+  "taskId": "task-2026-02-26T21-38-34-744Z-1",
+  "playtest": {
+    "type": "agent",
+    "durationSec": 180,
+    "capture": true
+  }
+}
