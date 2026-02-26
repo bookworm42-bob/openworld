@@ -14,6 +14,7 @@ const NAV_PRESSURE_THRESHOLD = Number(process.env.NAV_PRESSURE_THRESHOLD || 0.62
 const RECOVERY_BACKOFF_MS = Number(process.env.RECOVERY_BACKOFF_MS || 900);
 const RECOVERY_ARC_MS = Number(process.env.RECOVERY_ARC_MS || 1300);
 const LOCK_HESITATION_MAX_MS = Number(process.env.LOCK_HESITATION_MAX_MS || 3000);
+const LOCK_TO_ATTUNE_MAX_MS = Number(process.env.LOCK_TO_ATTUNE_MAX_MS || 2500);
 const LOCK_INTERACT_COOLDOWN_MS = Number(process.env.LOCK_INTERACT_COOLDOWN_MS || 1200);
 const STARTUP_NO_PROGRESS_MS = Number(process.env.STARTUP_NO_PROGRESS_MS || 6000);
 const STARTUP_DIST_EPS = Number(process.env.STARTUP_DIST_EPS || 0.05);
@@ -60,6 +61,9 @@ let startupTrackedDist = NaN;
 let startupTrackedSinceMs = 0;
 let startupActSeqSeen = 0;
 let lastBridgeControllerId = null;
+const objectiveLockToAttuneMs = new Map();
+const objectiveSplitSec = new Map();
+let routeHintFallbackCount = 0;
 
 const RNG_SEED = Number(process.env.ROAM_SEED || Date.now());
 let rngState = (RNG_SEED >>> 0) || 1;
@@ -139,6 +143,33 @@ function targetFromObjective(obs) {
     .sort((a, b) => safeNum(a.dist, 999) - safeNum(b.dist, 999))[0];
 
   return fallback || null;
+}
+
+function routeHintFromObjective(obs) {
+  const objective = obs?.objective || null;
+  const guidance = objective?.guidance || null;
+  const guidanceDist = safeNum(guidance?.dist, NaN);
+  if (Number.isFinite(guidanceDist) && guidanceDist <= 4.2) {
+    return null;
+  }
+
+  const dist = safeNum(
+    objective?.routeHintDist ?? guidance?.routeHintDist,
+    NaN
+  );
+  const bearing = safeNum(
+    objective?.routeHintBearing ?? guidance?.routeHintBearing,
+    NaN
+  );
+  if (!Number.isFinite(dist) || !Number.isFinite(bearing)) return null;
+
+  return {
+    id: objective?.routeHintId || guidance?.routeHintId || null,
+    index: Number.isFinite(objective?.routeHintIndex) ? objective.routeHintIndex : guidance?.routeHintIndex,
+    dist,
+    bearing,
+    objectiveId: objective?.activeObjectiveId || guidance?.objectiveId || null
+  };
 }
 
 function updateTargetProgress(target, nowMs) {
@@ -235,8 +266,13 @@ function buildAct(obs) {
     updateTargetProgress(target, nowMs);
     const bearing = safeNum(target.bearing, 0);
     const dist = safeNum(target.dist, 999);
+    const routeHint = routeHintFromObjective(obs);
     const avoid = front < 1.5 ? clamp1((left - right) / 1.6) : 0;
-    const desiredBearing = bearing + avoid * 0.35;
+    const hintBlend = routeHint && dist > 7.5 && Math.abs(bearing) > 1.1
+      ? Math.max(0, Math.min(1, Math.abs(bearing) / Math.PI))
+      : 0;
+    const blendedBearing = routeHint && hintBlend > 0 ? (bearing * (1 - hintBlend)) + (routeHint.bearing * hintBlend) : bearing;
+    const desiredBearing = blendedBearing + avoid * 0.35;
     const absBearing = Math.abs(desiredBearing);
 
     const desiredTurn = absBearing < 0.03 ? 0 : clamp1(desiredBearing * 1.18);
@@ -303,31 +339,37 @@ function buildAct(obs) {
   }
 
   const guidance = obs?.objective?.guidance || null;
-  if (guidance && Number.isFinite(guidance.dist) && Number.isFinite(guidance.bearing)) {
-    const bearing = safeNum(guidance.bearing, 0);
-    const dist = safeNum(guidance.dist, 999);
-    const absBearing = Math.abs(bearing);
-    const desiredTurn = absBearing < 0.03 ? 0 : clamp1(bearing * 1.1);
+  const routeHint = routeHintFromObjective(obs);
+  const hasGuidance = Number.isFinite(safeNum(guidance?.dist, NaN)) && Number.isFinite(safeNum(guidance?.bearing, NaN));
+  const hintDist = safeNum(hasGuidance ? guidance?.dist : routeHint?.dist, NaN);
+  const hintBearing = safeNum(hasGuidance ? guidance?.bearing : routeHint?.bearing, NaN);
+  if (Number.isFinite(hintDist) && Number.isFinite(hintBearing)) {
+    if (!hasGuidance && routeHint) routeHintFallbackCount += 1;
+    const absBearing = Math.abs(hintBearing);
+    const desiredTurn = absBearing < 0.03 ? 0 : clamp1(hintBearing * 1.1);
     const turn = clamp1(lastTurn * 0.66 + desiredTurn * 0.34);
     lastTurn = turn;
 
     let forward = 0;
     if (absBearing > 1.0) forward = 0.28;
     else if (absBearing > 0.7) forward = 0.32;
-    else if (dist > 8.0) forward = 0.92;
-    else if (dist > 4.0) forward = 0.7;
-    else if (dist > 2.6) forward = 0.34;
-    else if (dist > 2.2) forward = 0.24;
+    else if (hintDist > 8.0) forward = 0.92;
+    else if (hintDist > 4.0) forward = 0.7;
+    else if (hintDist > 2.6) forward = 0.34;
+    else if (hintDist > 2.2) forward = 0.24;
 
-    const hintInteractReady = Boolean(guidance.inInteractionRange) || dist <= TARGET_ARRIVAL_DIST;
-    const interact = hintInteractReady && absBearing < 0.24 && nowMs - lastInteractAt > 1800;
+    const canAttuneHint = Boolean(obs?.objective?.canAttune || guidance?.canAttune);
+    const hintInteractReady = Boolean(guidance?.inInteractionRange) || hintDist <= TARGET_ARRIVAL_DIST;
+    const interact = canAttuneHint
+      ? nowMs - lastInteractAt > LOCK_INTERACT_COOLDOWN_MS
+      : (hintInteractReady && absBearing < 0.24 && nowMs - lastInteractAt > 1800);
     if (interact) lastInteractAt = nowMs;
 
     return {
-      mode: 'objective_hint',
+      mode: !hasGuidance && routeHint ? 'route_hint' : 'objective_hint',
       targetId: obs?.objective?.activeObjectiveId || null,
-      targetDist: dist,
-      targetBearing: bearing,
+      targetDist: hintDist,
+      targetBearing: hintBearing,
       forward: clamp1(forward),
       strafe: 0,
       turn,
@@ -431,8 +473,22 @@ function startActLoop() {
 
     if (finaleCompleted || questCompleted) {
       const startupTrackedForMs = startupTrackedSinceMs > 0 ? Date.now() - startupTrackedSinceMs : 0;
+      const lockMetricSummary = [...objectiveLockToAttuneMs.entries()]
+        .map(([objectiveId, lockMs]) => `${objectiveId}:${Math.round(lockMs)}ms`)
+        .join(', ');
+      const violatedLockMetric = [...objectiveLockToAttuneMs.entries()]
+        .find(([, lockMs]) => Number.isFinite(lockMs) && lockMs > LOCK_TO_ATTUNE_MAX_MS);
+
+      if (violatedLockMetric) {
+        console.error(`[FAIL] lock_to_attune objective=${violatedLockMetric[0]} lockToAttuneMs=${Math.round(violatedLockMetric[1])} limitMs=${LOCK_TO_ATTUNE_MAX_MS}`);
+        stop(5);
+        return;
+      }
+
       console.log(`[METRIC] max_in_range_hesitation_ms=${Math.round(maxInRangeHesitationMs)}`);
       console.log(`[METRIC] startup_no_progress_window_ms=${Math.round(startupTrackedForMs)}`);
+      console.log(`[METRIC] route_hint_fallback_count=${routeHintFallbackCount}`);
+      if (lockMetricSummary) console.log(`[METRIC] lock_to_attune_ms_by_objective=${lockMetricSummary}`);
       console.log('[SUCCESS] finale completion observed; finishing run');
       stop(0);
     }
@@ -529,7 +585,34 @@ ws.addEventListener('message', (event) => {
       if (ev.type === 'objective_completed') {
         if (ev.objectiveId) completedObjectives.add(ev.objectiveId);
         inRangeSinceMs = 0;
+        if (ev.objectiveId && Number.isFinite(Number(ev.lockToAttuneMs))) {
+          objectiveLockToAttuneMs.set(ev.objectiveId, Number(ev.lockToAttuneMs));
+        }
+        if (ev.objectiveId && Number.isFinite(Number(ev.objectiveSplitSec))) {
+          objectiveSplitSec.set(ev.objectiveId, Number(ev.objectiveSplitSec));
+        }
         console.log(`[MISSION] objective_completed ${ev.objectiveId || 'unknown'} progress=${ev.progress ?? 'n/a'}`);
+      }
+      if (ev.type === 'objective_split') {
+        if (ev.objectiveId && Number.isFinite(Number(ev.lockToAttuneMs))) {
+          const lockMs = Number(ev.lockToAttuneMs);
+          objectiveLockToAttuneMs.set(ev.objectiveId, lockMs);
+          if (lockMs > LOCK_TO_ATTUNE_MAX_MS) {
+            console.error(`[FAIL] lock_to_attune objective=${ev.objectiveId} lockToAttuneMs=${lockMs} limitMs=${LOCK_TO_ATTUNE_MAX_MS}`);
+            stop(5);
+            return;
+          }
+        }
+        if (ev.objectiveId && Number.isFinite(Number(ev.objectiveSplitSec))) {
+          objectiveSplitSec.set(ev.objectiveId, Number(ev.objectiveSplitSec));
+        }
+        console.log(`[METRIC] objective_split objective=${ev.objectiveId || 'unknown'} splitSec=${ev.objectiveSplitSec ?? 'n/a'} lockToAttuneMs=${ev.lockToAttuneMs ?? 'n/a'} questElapsedSec=${ev.questElapsedSec ?? 'n/a'}`);
+      }
+      if (ev.type === 'objective_handoff_started') {
+        console.log(`[MISSION] objective_handoff_started from=${ev.fromObjectiveId || 'unknown'} to=${ev.toObjectiveId || 'unknown'} settleMs=${ev.settleMs ?? 'n/a'}`);
+      }
+      if (ev.type === 'objective_handoff_settled') {
+        console.log(`[MISSION] objective_handoff_settled from=${ev.fromObjectiveId || 'unknown'} to=${ev.toObjectiveId || 'unknown'} settleMs=${ev.settleMs ?? 'n/a'}`);
       }
       if (ev.type === 'objective_lock_acquired') {
         console.log(`[LOCK] acquired objective=${ev.objectiveId || 'unknown'} dist=${ev.activeBeaconDist ?? 'n/a'} bearing=${ev.activeBeaconBearing ?? 'n/a'}`);

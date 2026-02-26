@@ -1,0 +1,47 @@
+Task: task-2026-02-26T23-44-19-565Z-1
+Cycle: 2026-02-26T23-44-19-565Z
+
+What was implemented
+- Added deterministic active-leg route breadcrumbs (spawn->beacon_1, beacon_1->beacon_2, beacon_2->beacon_3, beacon_3->sanctum_core) with animated in-world pips and destination beam emphasis.
+- Added objective handoff pacing smoothing after attunement:
+  - temporary release of completed-objective collider during egress
+  - short egress turn assist to prevent immediate ping-pong against completed objectives
+  - new telemetry events: objective_handoff_started / objective_handoff_settled
+- Extended objective snapshot payload (additive only):
+  - routeHintId, routeHintIndex, routeHintDist, routeHintBearing
+  - objectiveSplitSec, questElapsedSec
+- Added objective_split telemetry events carrying objectiveSplitSec + lockToAttuneMs.
+- Upgraded scripts/playtest-beacon-pilgrimage.mjs to use route hints only when needed (fallback mode), preserve near-objective lock behavior, and assert lock-to-attune pacing threshold.
+
+Primary playtest command
+DEV_PORT=5189 BRIDGE_PORT=8809 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T23-44-19-565Z-task-2026-02-26T23-44-19-565Z-1 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh
+
+Required env vars / flags / script path
+- AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs
+- Isolated port pair per run (DEV_PORT / BRIDGE_PORT)
+- For pacing assertion: LOCK_TO_ATTUNE_MAX_MS defaults to 2500 (override only if needed)
+- Screenshot evidence run: TAKE_SCREENSHOTS=1 with SHOTS_DIR set
+
+Expected success signals
+- [MISSION] objective_handoff_started ... and objective_handoff_settled ... after each completed objective
+- [METRIC] objective_split objective=<id> splitSec=<...> lockToAttuneMs=<...>
+- [METRIC] startup_no_progress_window_ms=0
+- [METRIC] route_hint_fallback_count=<small/non-negative>
+- [SUCCESS] finale completion observed; finishing run
+- Screenshot run:
+  - [SNAPSHOT] saved .../00-before-agent.png
+  - [SNAPSHOT] saved .../99-after-agent.png
+
+What to verify visually
+- Active breadcrumb leg updates immediately at each objective handoff (previous leg fades out, next leg appears).
+- Breadcrumbs and destination emphasis are readable in screenshot captures.
+- After attunement, agent exits cleanly instead of colliding repeatedly with the just-completed objective.
+- Objective progression still reaches finale_completed and quest_completed deterministically.
+
+Known caveats / failure modes
+- If external clients share same bridge/dev ports, controller ownership can interfere with deterministic steering.
+- Route hints are fallback signals; if guidance/objective fields are externally modified or stripped, behavior may rely more on search mode and extend splits.
+
+Suggested extra tests
+- Repeat multi-seed sweep with screenshots enabled for ROAM_SEED=505 and 606.
+- Run with CAPTURE_ENABLED=1 to collect periodic frame captures and inspect leg-transition readability under motion.
