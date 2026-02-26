@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T22:49:42.336Z",
+  "updatedAt": "2026-02-26T22:56:03.348Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -33,6 +33,16 @@
       "owner": "playtester",
       "notes": "Playtest pass after rerun: ROAM_SEED=404 pilgrimage run reached quest_completed with lock/attunement signals and max_in_range_hesitation_ms=157; one intermittent startup stall observed in primary screenshot-enabled run.",
       "updatedAt": "2026-02-26T22:49:42.336Z"
+    },
+    {
+      "taskId": "task-2026-02-26T22-56-03-348Z-1",
+      "cycleId": "2026-02-26T22-56-03-348Z",
+      "title": "Deterministic bridge controller ownership and startup-stall elimination",
+      "status": "proposed",
+      "createdAt": "2026-02-26T22:56:03.348Z",
+      "deadlineAt": "2026-02-27T13:56:03.348Z",
+      "owner": "designer",
+      "notes": "Proposed comprehensive relay/client reliability pass to eliminate screenshot-mode startup stalls and keep pilgrimage control routing deterministic."
     }
   ]
 }

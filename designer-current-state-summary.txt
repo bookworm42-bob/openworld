@@ -111,3 +111,8 @@ Delta update (2026-02-26T22:30Z):
 - New top gameplay quality gap has shifted to close-range interaction feel: active beacon attunement still shows occasional in-range hesitation/orbit behavior before completion, and progression feedback is more log-visible than moment-to-moment game-readable.
 - Opened cycle `2026-02-26T22-30-52-343Z` for a cohesive attunement encounter polish pass (lock-on approach reliability, near-objective movement tuning, and stronger objective transition feedback + OBS metadata).
 
+Delta update (2026-02-26T22:56Z):
+- Reviewed latest cycle artifacts (`sim/cycles/2026-02-26T22-30-52-343Z/*`): attunement polish is implemented and passes on rerun, but playtester observed an intermittent screenshot-enabled startup stall (`objective_hint` distance pinned, no progression).
+- Verified likely root cause in current bridge plumbing: `agentBridge/wsRelayServer.js` keeps only a single mutable `gameConnection`; temporary snapshot clients can steal that slot and, on close, leave ACT routing detached even while another game client still streams OBS.
+- Opened cycle `2026-02-26T22-56-03-348Z` for a comprehensive deterministic bridge-ownership + observer-isolation reliability pass to eliminate startup stalls while preserving gameplay progression quality.
+

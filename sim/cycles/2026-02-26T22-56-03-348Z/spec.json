@@ -1,0 +1,34 @@
+{
+  "cycleId": "2026-02-26T22-56-03-348Z",
+  "vision": "Pilgrimage runs stay deterministic and responsive even when multiple browser clients (keepalive + screenshots + captures) are active: control never silently detaches from the live game, objective distance keeps progressing, and startup stalls no longer force manual reruns.",
+  "objectives": [
+    "Eliminate the intermittent startup/control stall seen in screenshot-enabled runs by preventing observer/snapshot clients from stealing or nulling the active game control channel.",
+    "Make relay ownership fail-safe: when the current game client disconnects, ACT/INTERACT routing must automatically hand over to another eligible live game client without dropping the control loop.",
+    "Expose bridge session diagnostics (active game session id/label + handoff events) in OBS/events so controllers and playtests can detect and explain routing transitions.",
+    "Harden run tooling so visual snapshot processes are explicitly non-controlling observers (or bridge-disabled), while the keepalive gameplay client remains the sole controller.",
+    "Validate with seeded pilgrimage runs (including screenshot-enabled mode) that quest_completed is reached without prolonged no-progress startup phases."
+  ],
+  "implementationHints": [
+    "Treat this as one cohesive reliability pass across relay + game client + playtest tooling; avoid ad-hoc one-off fixes in only one layer.",
+    "Keep protocol changes backward compatible by adding optional HELLO/OBS fields rather than breaking existing payload shapes.",
+    "Prefer deterministic ownership rules (explicit role/mode + clear failover) over timing-dependent heuristics."
+  ],
+  "implementationDetails": [
+    "In agentBridge/wsRelayServer.js, replace single mutable gameConnection pointer with tracked game peers metadata (connection id, role mode, lastSeen). Add deterministic active-controller selection that excludes observer clients.",
+    "Define HELLO extensions for game clients (e.g., clientLabel/sessionId/mode=controller|observer). Observer/snapshot clients may send OBS but must never become ACT targets.",
+    "When active controller disconnects, immediately promote the best remaining eligible game peer and continue routing ACT/INTERACT/CAPTURE/EDIT without requiring reconnect/manual rerun.",
+    "Emit bridge lifecycle events/metadata into OBS stream (e.g., bridge_controller_acquired, bridge_controller_lost, activeControllerId/label) so playtest logs can prove ownership transitions.",
+    "In src/agentBridge/config.js + client.js, add opt-in controls for observer/disabled bridge mode via env/query flag; ensure normal gameplay client defaults remain unchanged.",
+    "Update scripts/visual-snapshot.cjs (and run-agent-exploration.sh wiring if needed) so snapshot tabs launch in bridge-disabled or observer mode and cannot preempt control ownership.",
+    "Update scripts/browser-client-keepalive.cjs and/or run scripts to provide stable controller label/session metadata for deterministic relay selection and easier diagnostics.",
+    "Extend scripts/playtest-beacon-pilgrimage.mjs diagnostics for no-progress startup detection (objective distance unchanged + ACT sent) and record controller ownership signals when stalls are avoided.",
+    "Validation before handoff: npm run build passes; run seeded pilgrimage checks including ROAM_SEED=404 in both screenshot-disabled and screenshot-enabled profiles; each must reach quest_completed with OBS/ACT healthy and without prolonged static-distance startup state (>6s).",
+    "Record concrete evidence in exec_result.json: relay ownership logs/events, exact commands used, and at least one screenshot-enabled successful run artifact path."
+  ],
+  "taskId": "task-2026-02-26T22-56-03-348Z-1",
+  "playtest": {
+    "type": "agent",
+    "durationSec": 180,
+    "capture": true
+  }
+}
