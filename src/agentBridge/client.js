@@ -29,6 +29,7 @@ export class AgentBridgeClient {
     this.onCapture = onCapture;
     this.onEdit = onEdit;
     this.socket = null;
+    this.enabled = agentBridgeConfig.bridgeEnabled;
     this.connected = false;
     this.lastObsSentAt = 0;
     this.lastAct = NEUTRAL_ACT;
@@ -40,6 +41,8 @@ export class AgentBridgeClient {
   }
 
   connect() {
+    if (!this.enabled) return;
+
     const ws = new WebSocket(agentBridgeConfig.wsUrl);
     this.socket = ws;
 
@@ -49,6 +52,10 @@ export class AgentBridgeClient {
         type: 'HELLO',
         version: agentBridgeConfig.version,
         role: 'game',
+        mode: agentBridgeConfig.bridgeMode,
+        clientLabel: agentBridgeConfig.clientLabel,
+        sessionId: agentBridgeConfig.sessionId,
+        controllerPriority: agentBridgeConfig.controllerPriority,
         caps: ['obs', 'act', 'capture', 'edit']
       });
     });
@@ -101,11 +108,13 @@ export class AgentBridgeClient {
   }
 
   send(msg) {
+    if (!this.enabled) return;
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     this.socket.send(JSON.stringify(msg));
   }
 
   shouldSendObs(nowMs) {
+    if (!this.enabled) return false;
     return nowMs - this.lastObsSentAt >= agentBridgeConfig.obsIntervalMs;
   }
 
@@ -115,7 +124,7 @@ export class AgentBridgeClient {
   }
 
   getActState(nowMs) {
-    if (!this.connected) return NEUTRAL_ACT;
+    if (!this.enabled || !this.connected) return NEUTRAL_ACT;
     if (nowMs - this.lastActAt > agentBridgeConfig.actTimeoutMs) return NEUTRAL_ACT;
     return this.lastAct;
   }

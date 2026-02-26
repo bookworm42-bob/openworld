@@ -3,6 +3,12 @@ const { chromium } = require('playwright');
 function resolveLaunchOptions() {
   const mode = process.env.PLAYWRIGHT_LAUNCH_MODE || 'gpu';
   const headless = process.env.PLAYWRIGHT_HEADLESS !== 'false';
+  const commonArgs = [
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--disable-features=CalculateNativeWinOcclusion'
+  ];
 
   if (mode === 'legacy-software') {
     return {
@@ -15,11 +21,15 @@ function resolveLaunchOptions() {
         '--no-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu-sandbox',
-      ],
+        ...commonArgs
+      ]
     };
   }
 
-  return { headless };
+  return {
+    headless,
+    args: commonArgs
+  };
 }
 
 async function launchChromium() {
@@ -28,5 +38,5 @@ async function launchChromium() {
 
 module.exports = {
   launchChromium,
-  resolveLaunchOptions,
+  resolveLaunchOptions
 };

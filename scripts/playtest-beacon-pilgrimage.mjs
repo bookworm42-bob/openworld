@@ -15,6 +15,9 @@ const RECOVERY_BACKOFF_MS = Number(process.env.RECOVERY_BACKOFF_MS || 900);
 const RECOVERY_ARC_MS = Number(process.env.RECOVERY_ARC_MS || 1300);
 const LOCK_HESITATION_MAX_MS = Number(process.env.LOCK_HESITATION_MAX_MS || 3000);
 const LOCK_INTERACT_COOLDOWN_MS = Number(process.env.LOCK_INTERACT_COOLDOWN_MS || 1200);
+const STARTUP_NO_PROGRESS_MS = Number(process.env.STARTUP_NO_PROGRESS_MS || 6000);
+const STARTUP_DIST_EPS = Number(process.env.STARTUP_DIST_EPS || 0.05);
+const STARTUP_NO_PROGRESS_MIN_DIST = Number(process.env.STARTUP_NO_PROGRESS_MIN_DIST || 3.2);
 const CAPTURE_ENABLED = process.env.CAPTURE_ENABLED !== '0';
 const CAPTURE_EVERY_SEC = Number(process.env.CAPTURE_EVERY_SEC || 18);
 const CAPTURE_W = Number(process.env.CAPTURE_W || 1280);
@@ -50,6 +53,12 @@ let lastRecoveryAt = 0;
 let inRangeSinceMs = 0;
 let maxInRangeHesitationMs = 0;
 let runFailedForHesitation = false;
+let startupStallFailed = false;
+let startupTrackedObjectiveId = null;
+let startupTrackedDist = NaN;
+let startupTrackedSinceMs = 0;
+let startupActSeqSeen = 0;
+let lastBridgeControllerId = null;
 
 const RNG_SEED = Number(process.env.ROAM_SEED || Date.now());
 let rngState = (RNG_SEED >>> 0) || 1;
@@ -306,8 +315,10 @@ function buildAct(obs) {
     else if (dist > 8.0) forward = 0.92;
     else if (dist > 4.0) forward = 0.7;
     else if (dist > 2.6) forward = 0.34;
+    else if (dist > 2.2) forward = 0.24;
 
-    const interact = Boolean(guidance.inInteractionRange) && absBearing < 0.24 && nowMs - lastInteractAt > 1800;
+    const hintInteractReady = Boolean(guidance.inInteractionRange) || dist <= TARGET_ARRIVAL_DIST;
+    const interact = hintInteractReady && absBearing < 0.24 && nowMs - lastInteractAt > 1800;
     if (interact) lastInteractAt = nowMs;
 
     return {
@@ -375,9 +386,11 @@ function startActLoop() {
     maybeRequestCapture(tSec);
 
     const base = buildAct(latestObs);
+    const actSeq = ++seq;
+    startupActSeqSeen = actSeq;
     send({
       type: 'ACT',
-      seq: ++seq,
+      seq: actSeq,
       forward: clamp1(base.forward),
       strafe: clamp1(base.strafe),
       turn: clamp1(base.turn),
@@ -402,8 +415,22 @@ function startActLoop() {
       return;
     }
 
+    if (!startupStallFailed && startupTrackedSinceMs > 0 && startupActSeqSeen > 0 && !questCompleted) {
+      const stalledForMs = Date.now() - startupTrackedSinceMs;
+      if (stalledForMs >= STARTUP_NO_PROGRESS_MS) {
+        startupStallFailed = true;
+        console.error(
+          `[FAIL] startup_no_progress objective=${startupTrackedObjectiveId || 'unknown'} dist=${Number.isFinite(startupTrackedDist) ? startupTrackedDist.toFixed(2) : 'n/a'} stalledForMs=${Math.round(stalledForMs)} limitMs=${STARTUP_NO_PROGRESS_MS}`
+        );
+        stop(4);
+        return;
+      }
+    }
+
     if (questCompleted) {
+      const startupTrackedForMs = startupTrackedSinceMs > 0 ? Date.now() - startupTrackedSinceMs : 0;
       console.log(`[METRIC] max_in_range_hesitation_ms=${Math.round(maxInRangeHesitationMs)}`);
+      console.log(`[METRIC] startup_no_progress_window_ms=${Math.round(startupTrackedForMs)}`);
       console.log('[SUCCESS] quest_completed observed; finishing run');
       stop(0);
     }
@@ -448,8 +475,49 @@ ws.addEventListener('message', (event) => {
       console.log('[OBS] first observation received');
     }
 
+    const bridge = msg.bridge && typeof msg.bridge === 'object' ? msg.bridge : null;
+    if (bridge) {
+      const controllerId = typeof bridge.activeControllerId === 'string' ? bridge.activeControllerId : null;
+      if (controllerId !== lastBridgeControllerId) {
+        lastBridgeControllerId = controllerId;
+        console.log(
+          `[BRIDGE] active_controller id=${bridge.activeControllerId || 'none'} label=${bridge.activeControllerLabel || 'n/a'} mode=${bridge.activeControllerMode || 'n/a'} session=${bridge.activeControllerSessionId || 'n/a'}`
+        );
+      }
+    }
+
+    const objective = msg.objective || {};
+    const guidance = objective.guidance || null;
+    const trackedObjectiveId = objective.activeObjectiveId || null;
+    const trackedDist = safeNum(guidance?.dist, NaN);
+    const lockStableMs = safeNum(objective.lockStableMs ?? guidance?.lockStableMs, 0);
+    const shouldTrackStartup = Number.isFinite(trackedDist)
+      && trackedDist >= STARTUP_NO_PROGRESS_MIN_DIST
+      && lockStableMs <= 200;
+
+    if (startupActSeqSeen > 0 && shouldTrackStartup && !questCompleted) {
+      const now = Date.now();
+      if (trackedObjectiveId !== startupTrackedObjectiveId || !Number.isFinite(startupTrackedDist)) {
+        startupTrackedObjectiveId = trackedObjectiveId;
+        startupTrackedDist = trackedDist;
+        startupTrackedSinceMs = now;
+      } else if (Math.abs(trackedDist - startupTrackedDist) > STARTUP_DIST_EPS) {
+        startupTrackedDist = trackedDist;
+        startupTrackedSinceMs = now;
+      }
+    } else {
+      startupTrackedSinceMs = 0;
+      startupTrackedDist = trackedDist;
+      startupTrackedObjectiveId = trackedObjectiveId;
+    }
+
     const events = Array.isArray(msg.events) ? msg.events : [];
     for (const ev of events) {
+      if (typeof ev.type === 'string' && ev.type.startsWith('bridge_controller_')) {
+        console.log(
+          `[BRIDGE_EVENT] type=${ev.type} reason=${ev.reason || 'n/a'} active=${ev.activeControllerId || 'none'} label=${ev.activeControllerLabel || ev.previousControllerLabel || 'n/a'}`
+        );
+      }
       if (ev.type === 'objective_started') {
         console.log(`[MISSION] objective_started ${ev.objectiveId || 'unknown'} progress=${ev.progress ?? 'n/a'}`);
       }

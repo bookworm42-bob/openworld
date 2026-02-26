@@ -4,6 +4,10 @@ async function main() {
   const devUrl = process.env.DEV_URL || 'http://127.0.0.1:5173';
   const hardRefresh = process.env.BROWSER_CLIENT_HARD_REFRESH !== '0';
   const navTimeoutMs = Math.max(5000, Number(process.env.BROWSER_CLIENT_NAV_TIMEOUT_MS || 45000));
+  const bridgeMode = (process.env.BROWSER_CLIENT_BRIDGE_MODE || 'controller').toLowerCase();
+  const bridgeLabel = process.env.BROWSER_CLIENT_LABEL || 'keepalive-controller';
+  const bridgeSessionId = process.env.BROWSER_CLIENT_SESSION_ID || `keepalive-${Date.now()}`;
+  const bridgePriority = Number(process.env.BROWSER_CLIENT_BRIDGE_PRIORITY || 100);
 
   let browser;
   let closing = false;
@@ -26,16 +30,24 @@ async function main() {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
   try {
+    const url = new URL(devUrl);
+    url.searchParams.set('agentBridgeMode', bridgeMode === 'observer' ? 'observer' : 'controller');
+    url.searchParams.set('agentBridgeLabel', bridgeLabel);
+    url.searchParams.set('agentBridgeSessionId', bridgeSessionId);
+    url.searchParams.set('agentBridgePriority', String(bridgePriority));
+
     browser = await launchChromium();
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto(devUrl, { waitUntil: 'domcontentloaded', timeout: navTimeoutMs });
+    await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: navTimeoutMs });
 
     if (hardRefresh) {
       await page.reload({ waitUntil: 'domcontentloaded', timeout: navTimeoutMs });
     }
 
-    console.log(`[BROWSER_CLIENT] ready ${devUrl} hardRefresh=${hardRefresh}`);
+    console.log(
+      `[BROWSER_CLIENT] ready ${url.toString()} hardRefresh=${hardRefresh} bridgeMode=${url.searchParams.get('agentBridgeMode')} label=${bridgeLabel} priority=${bridgePriority}`
+    );
   } catch (error) {
     console.error('[BROWSER_CLIENT_ERROR]', error?.message || error);
     process.exit(1);

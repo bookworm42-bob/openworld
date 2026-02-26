@@ -1,0 +1,48 @@
+Task: task-2026-02-26T22-56-03-348Z-1
+Cycle: 2026-02-26T22-56-03-348Z
+
+Implemented
+- Reworked relay ownership in agentBridge/wsRelayServer.js to track multiple game peers, exclude observer clients from control routing, and auto-failover controller selection when controller peers change/disconnect.
+- Added optional HELLO metadata support (mode/clientLabel/sessionId/controllerPriority) while keeping backward compatibility.
+- Added bridge ownership diagnostics to OBS payloads:
+  - OBS.bridge.activeControllerId/label/session/mode
+  - OBS.events emits bridge_controller_acquired / bridge_controller_lost lifecycle events.
+- Added bridge mode controls in src/agentBridge/config.js + client.js:
+  - query/env-driven mode: controller | observer | disabled
+  - client label/session/priority propagation in HELLO.
+- Hardened automation tooling:
+  - scripts/visual-snapshot.cjs now opens observer-mode snapshot tabs.
+  - scripts/browser-client-keepalive.cjs now opens a labeled priority controller tab.
+  - scripts/run-agent-exploration.sh now wires bridge ws port/env consistently and defaults keepalive headless.
+  - scripts/lib/launch-playwright.cjs adds anti-throttling launch flags for stable background control.
+- Updated scripts/playtest-beacon-pilgrimage.mjs with:
+  - startup no-progress watchdog diagnostics,
+  - bridge ownership/bridge event logging,
+  - guidance-branch near-target movement + interact fallback to avoid 2.4m deadlock.
+
+Primary playtest command
+DEV_PORT=5182 BRIDGE_PORT=8802 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T22-56-03-348Z-task-2026-02-26T22-56-03-348Z-1 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh
+
+Required env/flags/script path
+- AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs
+- Use isolated DEV_PORT/BRIDGE_PORT pair for deterministic ownership during validation.
+- Screenshot flow uses observer mode automatically (no extra flag needed; harness sets SNAPSHOT_BRIDGE_MODE=observer).
+
+Expected success signals
+- [BRIDGE] active_controller ... label=keepalive-controller
+- [SNAPSHOT] bridge_mode=observer ... (before/after)
+- [BRIDGE_EVENT] type=bridge_controller_acquired ... (in non-screenshot smoke or when transitions occur)
+- [MISSION] quest_completed progress=1
+- [METRIC] startup_no_progress_window_ms=0
+
+Visual checks for Playtester
+- Before/after screenshots are produced in artifacts/try-2026-02-26T22-56-03-348Z-task-2026-02-26T22-56-03-348Z-1.
+- Agent run should visibly progress beacon_1 -> beacon_2 -> beacon_3 with no startup freeze at fixed objective distance.
+
+Known caveats / failure modes
+- If stale manual browser tabs are attached to the same dev+bridge ports, they can still appear as controller candidates; using dedicated DEV_PORT/BRIDGE_PORT per run avoids this.
+- Legacy clients that do not send HELLO metadata still work but default to controller mode/priority 0.
+
+Suggested extra tests
+- Force controller failover by killing the keepalive browser process mid-run and verify bridge_controller_lost/bridge_controller_acquired appears and quest still completes.
+- Run one screenshot-enabled seed matrix (404 + 505) to check startup watchdog stays quiet.

@@ -1,0 +1,60 @@
+{
+  "taskId": "task-2026-02-26T22-56-03-348Z-1",
+  "cycleId": "2026-02-26T22-56-03-348Z",
+  "status": "implemented",
+  "summary": "Implemented deterministic relay controller ownership + failover, explicit observer/controller client modes, bridge ownership diagnostics in OBS/events, and hardened run tooling so snapshot clients stay non-controlling while keepalive remains the controller.",
+  "changedFiles": [
+    "agentBridge/wsRelayServer.js",
+    "src/agentBridge/config.js",
+    "src/agentBridge/client.js",
+    "scripts/run-agent-exploration.sh",
+    "scripts/browser-client-keepalive.cjs",
+    "scripts/visual-snapshot.cjs",
+    "scripts/lib/launch-playwright.cjs",
+    "scripts/playtest-beacon-pilgrimage.mjs",
+    "sim/task_board.json",
+    "sim/tasks/task-2026-02-26T22-56-03-348Z-1/executor_state.json",
+    "sim/cycles/2026-02-26T22-56-03-348Z/exec_result.json",
+    "sim/cycles/2026-02-26T22-56-03-348Z/playtest_handoff.txt"
+  ],
+  "build": {
+    "command": "npm run build",
+    "result": "pass"
+  },
+  "selfTests": [
+    {
+      "command": "DEV_PORT=5181 BRIDGE_PORT=8801 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-rerun6.log:17 [BRIDGE] active_controller ... label=keepalive-controller",
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-rerun6.log:77 [MISSION] quest_completed progress=1",
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-rerun6.log:79 [METRIC] startup_no_progress_window_ms=0"
+      ]
+    },
+    {
+      "command": "DEV_PORT=5182 BRIDGE_PORT=8802 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T22-56-03-348Z-task-2026-02-26T22-56-03-348Z-1 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-shots.log:14 [SNAPSHOT] bridge_mode=observer label=snapshot-before-...",
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-shots.log:20 [BRIDGE] active_controller ... label=keepalive-controller",
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-shots.log:80 [MISSION] quest_completed progress=1",
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-shots.log:85 [SNAPSHOT] saved .../99-after-agent.png"
+      ]
+    },
+    {
+      "command": "DEV_PORT=5183 BRIDGE_PORT=8803 ROAM_SEED=404 RUN_SEC=60 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "result": "pass",
+      "evidence": [
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-bridgeevents.log:18 [BRIDGE_EVENT] type=bridge_controller_acquired ...",
+        "artifacts/executor/2026-02-26T22-56-03-348Z/playtest-seed-404-bridgeevents.log:57 [MISSION] quest_completed progress=1"
+      ]
+    }
+  ],
+  "notes": [
+    "Relay now tracks multiple game peers and deterministically routes ACT/INTERACT/CAPTURE/EDIT to an active controller (observers excluded).",
+    "HELLO protocol remains backward compatible; new optional fields supported: mode, clientLabel, sessionId, controllerPriority.",
+    "Bridge ownership metadata is attached to OBS.bridge and controller lifecycle events are emitted in OBS.events (bridge_controller_acquired/lost).",
+    "Run harness now marks snapshot tabs observer-only and tags keepalive with explicit controller identity/priority.",
+    "Playtest controller gained startup no-progress watchdog plus bridge ownership logging; near-target guidance interact behavior was hardened to prevent 2.4m deadlocks."
+  ]
+}

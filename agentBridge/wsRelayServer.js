@@ -61,6 +61,14 @@ function decodeFrames(state, chunk, onFrame) {
   }
 }
 
+function normalizeRole(value) {
+  return value === 'game' ? 'game' : 'agent';
+}
+
+function normalizeGameMode(value) {
+  return value === 'observer' ? 'observer' : 'controller';
+}
+
 class RelayConnection {
   constructor(socket, server) {
     this.socket = socket;
@@ -116,37 +124,191 @@ class RelayConnection {
 
 export function createAgentRelayServer({ port = 8787 } = {}) {
   const connections = new Set();
-  let gameConnection = null;
   const agentConnections = new Set();
+  const gamePeers = new Map();
+  const bridgeEvents = [];
+  let gamePeerOrder = 0;
+  let activeControllerId = null;
 
   const server = http.createServer((_, res) => {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, service: 'agent-bridge', version: 'v1' }));
   });
 
+  function queueBridgeEvent(type, fields = {}) {
+    bridgeEvents.push({
+      type,
+      at: Date.now(),
+      ...fields
+    });
+    if (bridgeEvents.length > 24) bridgeEvents.splice(0, bridgeEvents.length - 24);
+  }
+
+  function listEligibleControllers() {
+    return [...gamePeers.values()]
+      .filter((peer) => peer.mode === 'controller' && !peer.conn.closed)
+      .sort((a, b) => {
+        if (a.controllerPriority !== b.controllerPriority) return b.controllerPriority - a.controllerPriority;
+        if (a.lastSeenAt !== b.lastSeenAt) return b.lastSeenAt - a.lastSeenAt;
+        return a.order - b.order;
+      });
+  }
+
+  function getActiveController() {
+    if (!activeControllerId) return null;
+    const peer = gamePeers.get(activeControllerId);
+    if (!peer || peer.conn.closed || peer.mode !== 'controller') return null;
+    return peer;
+  }
+
+  function buildBridgeMeta() {
+    const active = getActiveController();
+    return {
+      activeControllerId: active?.id || null,
+      activeControllerLabel: active?.clientLabel || null,
+      activeControllerSessionId: active?.sessionId || null,
+      activeControllerMode: active?.mode || null,
+      controllerCandidates: listEligibleControllers().map((peer) => ({
+        id: peer.id,
+        label: peer.clientLabel || null,
+        sessionId: peer.sessionId || null,
+        mode: peer.mode,
+        priority: peer.controllerPriority || 0
+      }))
+    };
+  }
+
+  function pickController(preferredConn = null) {
+    const current = getActiveController();
+    if (current) return current;
+
+    if (preferredConn) {
+      const preferred = gamePeers.get(preferredConn.id);
+      if (preferred && preferred.mode === 'controller' && !preferred.conn.closed) return preferred;
+    }
+
+    const [next] = listEligibleControllers();
+    return next || null;
+  }
+
+  function setActiveController(nextPeer, reason = 'unknown') {
+    const previous = getActiveController();
+    const nextId = nextPeer?.id || null;
+    const prevId = previous?.id || null;
+
+    activeControllerId = nextId;
+
+    if (prevId === nextId) return;
+
+    if (previous) {
+      queueBridgeEvent('bridge_controller_lost', {
+        reason,
+        previousControllerId: previous.id,
+        previousControllerLabel: previous.clientLabel || null,
+        previousControllerSessionId: previous.sessionId || null
+      });
+    }
+
+    if (nextPeer) {
+      queueBridgeEvent('bridge_controller_acquired', {
+        reason,
+        activeControllerId: nextPeer.id,
+        activeControllerLabel: nextPeer.clientLabel || null,
+        activeControllerSessionId: nextPeer.sessionId || null,
+        activeControllerMode: nextPeer.mode
+      });
+    }
+  }
+
+  function ensureController(reason = 'unknown', preferredConn = null) {
+    const next = pickController(preferredConn);
+    setActiveController(next, reason);
+    return next;
+  }
+
+  function updateGamePeerFromHello(conn, msg) {
+    const now = Date.now();
+    const existing = gamePeers.get(conn.id);
+    const peer = existing || {
+      id: conn.id,
+      conn,
+      order: ++gamePeerOrder,
+      sessionId: null,
+      clientLabel: null,
+      mode: 'controller',
+      controllerPriority: 0,
+      lastSeenAt: now,
+      helloAt: now
+    };
+
+    if (!existing) gamePeers.set(conn.id, peer);
+
+    peer.lastSeenAt = now;
+    peer.sessionId = typeof msg.sessionId === 'string' && msg.sessionId.trim() ? msg.sessionId.trim() : peer.sessionId;
+    peer.clientLabel = typeof msg.clientLabel === 'string' && msg.clientLabel.trim() ? msg.clientLabel.trim() : peer.clientLabel;
+    peer.mode = normalizeGameMode(msg.mode);
+    peer.controllerPriority = Number.isFinite(Number(msg.controllerPriority)) ? Number(msg.controllerPriority) : peer.controllerPriority;
+
+    if (peer.mode === 'observer' && activeControllerId === peer.id) {
+      ensureController('observer_mode', null);
+      return;
+    }
+
+    if (peer.mode === 'controller') {
+      ensureController('hello_controller', conn);
+    }
+  }
+
+  function annotateObs(msg) {
+    const baseEvents = Array.isArray(msg.events) ? msg.events : [];
+    const queued = agentConnections.size > 0 ? bridgeEvents.splice(0, bridgeEvents.length) : [];
+    return {
+      ...msg,
+      bridge: {
+        ...(msg.bridge && typeof msg.bridge === 'object' ? msg.bridge : {}),
+        ...buildBridgeMeta()
+      },
+      events: queued.length ? [...baseEvents, ...queued] : baseEvents
+    };
+  }
+
   function broadcastToAgents(msg) {
     for (const conn of agentConnections) conn.send(msg);
+  }
+
+  function routeToController(msg) {
+    const active = ensureController('route_request', null);
+    if (!active) return false;
+    active.conn.send(msg);
+    return true;
   }
 
   function handleMessage(conn, msg) {
     if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') return;
 
     if (msg.type === 'HELLO') {
-      const role = msg.role === 'game' ? 'game' : 'agent';
+      const role = normalizeRole(msg.role);
       conn.role = role;
+
       if (role === 'game') {
-        gameConnection = conn;
+        updateGamePeerFromHello(conn, msg);
       } else {
         agentConnections.add(conn);
       }
-      conn.send({ type: 'HELLO', version: 'v1', caps: ['obs', 'act', 'capture', 'edit'] });
+
+      conn.send({
+        type: 'HELLO',
+        version: 'v1',
+        caps: ['obs', 'act', 'capture', 'edit'],
+        bridge: buildBridgeMeta()
+      });
       return;
     }
 
     if (conn.role === 'unknown') {
       if (msg.type === 'OBS' || msg.type === 'CAPTURED' || msg.type === 'INTERACTED' || msg.type === 'EDITED') {
         conn.role = 'game';
-        gameConnection = conn;
+        updateGamePeerFromHello(conn, { mode: 'controller' });
       } else {
         conn.role = 'agent';
         agentConnections.add(conn);
@@ -154,22 +316,38 @@ export function createAgentRelayServer({ port = 8787 } = {}) {
     }
 
     if (conn.role === 'game') {
-      if (msg.type === 'OBS' || msg.type === 'CAPTURED' || msg.type === 'INTERACTED' || msg.type === 'EDITED' || msg.type === 'HELLO') {
+      const peer = gamePeers.get(conn.id);
+      if (peer) peer.lastSeenAt = Date.now();
+
+      if (msg.type === 'OBS') {
+        broadcastToAgents(annotateObs(msg));
+        return;
+      }
+
+      if (msg.type === 'CAPTURED' || msg.type === 'INTERACTED' || msg.type === 'EDITED' || msg.type === 'HELLO') {
         broadcastToAgents(msg);
       }
       return;
     }
 
-    if (!gameConnection) return;
     if (msg.type === 'ACT' || msg.type === 'INTERACT' || msg.type === 'CAPTURE' || msg.type === 'EDIT' || msg.type === 'HELLO') {
-      gameConnection.send(msg);
+      routeToController(msg);
     }
   }
 
   function onClose(conn) {
     connections.delete(conn);
     agentConnections.delete(conn);
-    if (gameConnection === conn) gameConnection = null;
+
+    const peer = gamePeers.get(conn.id);
+    if (!peer) return;
+
+    gamePeers.delete(conn.id);
+
+    if (activeControllerId === conn.id) {
+      setActiveController(null, 'disconnect');
+      ensureController('failover_after_disconnect', null);
+    }
   }
 
   server.on('upgrade', (req, socket) => {
