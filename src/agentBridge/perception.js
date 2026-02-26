@@ -65,7 +65,7 @@ function classifySize(root) {
 
 function getAffordances(tag) {
   if (tag === 'npc') return ['talk'];
-  if (tag === 'orb' || tag === 'tower') return ['interact'];
+  if (tag === 'beacon' || tag === 'tower') return ['interact'];
   return ['none'];
 }
 
@@ -176,6 +176,7 @@ export function buildObservation({
   heading,
   stuck,
   events,
+  objective,
   perceivableRoots,
   occluders,
   latestPerceivedIds
@@ -218,6 +219,7 @@ export function buildObservation({
       ray: sensors,
       stuck: Boolean(stuck)
     },
+    objective: objective || null,
     perceived,
     events
   };

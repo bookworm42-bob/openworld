@@ -1,0 +1,47 @@
+Task id: task-2026-02-26T21-38-34-744Z-1
+Cycle id: 2026-02-26T21-38-34-744Z
+
+What was implemented:
+- Replaced single-orb interaction with a full 3-step beacon pilgrimage quest (beacon_1 -> beacon_2 -> beacon_3).
+- Added beacon state visuals: inactive (dim/no beam), active (bright pulsing beam), completed (green completed state).
+- Added quest UI/UX: contextual interaction prompt, status toasts, objective HUD, completion banner.
+- Added strict progression logic with explicit out-of-order rejection handling.
+- Added bridge-visible objective snapshot in OBS: questId, phase, activeObjectiveId, completedObjectiveIds, progress, guidance, recentEvents.
+- Added quest event emission into bridge event stream: objective_started, objective_completed, quest_completed, rejected.
+- Added dedicated controller: scripts/playtest-beacon-pilgrimage.mjs with objective-driven targeting, interaction, and roam/recovery fallback.
+
+Primary Playtester command:
+AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs RUN_SEC=180 CAPTURE_ENABLED=1 CAPTURE_EVERY_SEC=20 TAKE_SCREENSHOTS=1 ./scripts/run-agent-exploration.sh
+
+Required env vars/flags and script path:
+- AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs
+- RUN_SEC=180
+- CAPTURE_ENABLED=1
+- CAPTURE_EVERY_SEC=20
+- TAKE_SCREENSHOTS=1
+- Script must be run through ./scripts/run-agent-exploration.sh
+
+Expected success signals in logs/events:
+- [OBS] first observation received
+- [MISSION] objective_completed beacon_1 progress=0.333...
+- [MISSION] objective_completed beacon_2 progress=0.667...
+- [MISSION] objective_completed beacon_3 progress=1
+- [MISSION] quest_completed progress=1
+- [SUCCESS] quest_completed observed; finishing run
+- Exit code 0 from run-agent script
+
+What to verify visually:
+- Active beacon has strongest beam/pulse and inactive beacons are visibly subdued.
+- After attuning each beacon, active state advances to the next beacon.
+- Completed beacons stay in completed/green state while quest continues.
+- Objective HUD updates stage/progress, and completion banner appears at the end.
+
+Known caveats/failure modes:
+- Controller may briefly retarget nearby non-beacon interactables/landmarks before reacquiring objective beacon (should recover).
+- If browser focus/client keepalive is broken, OBS may not stream and test appears stalled.
+- Guidance-based objective mode assumes objective.guidance exists in OBS; if missing, script falls back to perceived beacon targeting + roam.
+
+Suggested extra tests:
+- Force out-of-order interaction manually (or via targeted INTERACT) and verify rejected event + rejection toast.
+- Run with TAKE_SCREENSHOTS=0 for quicker repeated validations.
+- Run default exploration script to confirm no regression: ./scripts/run-agent-exploration.sh

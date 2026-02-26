@@ -436,13 +436,26 @@ const gravity = 26;
 const jumpVelocity = 9;
 let groundedY = 0;
 
-const interactable = {
-  mesh: null,
-  radius: 2.2,
-  activated: false,
+const BEACON_LAYOUT = [
+  { id: 'beacon_1', label: 'Beacon I', position: new THREE.Vector2(5.5, -4.2) },
+  { id: 'beacon_2', label: 'Beacon II', position: new THREE.Vector2(25, -15.2) },
+  { id: 'beacon_3', label: 'Beacon III', position: new THREE.Vector2(60, 28) }
+];
+
+const pilgrimageQuest = {
+  questId: 'beacon_pilgrimage',
+  phase: 'intro',
+  activeObjectiveId: null,
+  completedObjectiveIds: [],
+  progress: 0,
+  radius: 2.8,
+  beacons: [],
   promptEl: null,
   statusEl: null,
-  agentId: 'orb_spawn'
+  objectiveHudEl: null,
+  completionBannerEl: null,
+  completionBannerTimer: null,
+  recentEvents: []
 };
 
 const modeHud = {
@@ -1276,42 +1289,235 @@ async function createSetDressing() {
   markBootStage('setDressingReady', `sceneChildren=${scene.children.length}`);
 }
 
-function createInteractable() {
+function createBeacon({ id, label, position }) {
   const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.45, 0.6, 0.25, 24),
-    new THREE.MeshStandardMaterial({ color: 0x4a5b75, roughness: 0.55, metalness: 0.35 })
+    new THREE.CylinderGeometry(0.55, 0.8, 0.38, 28),
+    applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: 0x43546b, roughness: 0.56, metalness: 0.24 }))
   );
-  base.position.set(4.5, 0.12, -2.8);
-  base.receiveShadow = true;
 
-  const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(0.38, 24, 24),
-    new THREE.MeshStandardMaterial({
-      color: 0x9ed6ff,
-      emissive: 0x4b7fd3,
-      emissiveIntensity: 0.7,
-      roughness: 0.25,
+  const topRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.44, 0.08, 12, 36),
+    applyWarmRimAccent(new THREE.MeshStandardMaterial({ color: 0x5d7aa1, roughness: 0.35, metalness: 0.48 }))
+  );
+  topRing.rotation.x = Math.PI / 2;
+  topRing.position.y = 0.28;
+  base.add(topRing);
+
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 24, 24),
+    applyWarmRimAccent(new THREE.MeshStandardMaterial({
+      color: 0x84a7d9,
+      emissive: 0x274b82,
+      emissiveIntensity: 0.55,
+      roughness: 0.26,
       metalness: 0.12
+    }))
+  );
+  core.position.y = 0.62;
+  core.castShadow = true;
+  base.add(core);
+
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.13, 0.3, 8.8, 20, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0x86d4ff,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
     })
   );
-  orb.position.y = 0.42;
-  orb.castShadow = true;
-  base.add(orb);
+  beam.position.y = 4.8;
+  beam.visible = false;
+  base.add(beam);
 
-  interactable.mesh = base;
-  interactable.mesh.userData.agentPerceivable = true;
-  interactable.mesh.userData.agentTag = 'orb';
-  interactable.mesh.userData.agentId = interactable.agentId;
+  const x = position.x;
+  const z = position.y;
+  const y = getTerrainHeightAt(x, z) + 0.19;
+  base.position.set(x, y, z);
+  base.receiveShadow = true;
+  base.castShadow = true;
+  base.userData.agentPerceivable = true;
+  base.userData.agentTag = 'beacon';
+  base.userData.agentId = id;
+  base.userData.beaconLabel = label;
   scene.add(base);
 
-  interactable.promptEl = document.createElement('div');
-  interactable.promptEl.id = 'interaction-prompt';
-  interactable.promptEl.textContent = 'Press E to inspect glowing orb';
-  document.body.appendChild(interactable.promptEl);
+  return {
+    id,
+    label,
+    mesh: base,
+    core,
+    beam,
+    state: 'inactive',
+    baseCoreY: core.position.y
+  };
+}
 
-  interactable.statusEl = document.createElement('div');
-  interactable.statusEl.id = 'interaction-status';
-  document.body.appendChild(interactable.statusEl);
+function getObjectiveSnapshot() {
+  const activeBeacon = getActiveBeacon();
+  let guidance = null;
+
+  if (player && activeBeacon?.mesh) {
+    const toTarget = new THREE.Vector3().subVectors(activeBeacon.mesh.position, player.position);
+    const dist = toTarget.length();
+
+    const flatForward = lastMoveHeading.clone().setY(0);
+    if (flatForward.lengthSq() < 0.0001) flatForward.set(0, 0, -1);
+    else flatForward.normalize();
+
+    const flatToTarget = toTarget.setY(0);
+    if (flatToTarget.lengthSq() > 0.0001) {
+      flatToTarget.normalize();
+      const bearing = Math.atan2(
+        flatForward.x * flatToTarget.z - flatForward.z * flatToTarget.x,
+        flatForward.dot(flatToTarget)
+      );
+      guidance = {
+        dist: Number(dist.toFixed(2)),
+        bearing: Number(bearing.toFixed(3)),
+        inInteractionRange: dist <= pilgrimageQuest.radius
+      };
+    }
+  }
+
+  return {
+    questId: pilgrimageQuest.questId,
+    phase: pilgrimageQuest.phase,
+    activeObjectiveId: pilgrimageQuest.activeObjectiveId,
+    completedObjectiveIds: [...pilgrimageQuest.completedObjectiveIds],
+    progress: Number(pilgrimageQuest.progress.toFixed(3)),
+    guidance,
+    recentEvents: pilgrimageQuest.recentEvents.slice(-6).map((entry) => ({ ...entry }))
+  };
+}
+
+function rememberQuestEvent(type, extra = {}) {
+  const entry = {
+    type,
+    at: Number(clock.elapsedTime.toFixed(3)),
+    ...extra
+  };
+  pilgrimageQuest.recentEvents.push(entry);
+  if (pilgrimageQuest.recentEvents.length > 16) pilgrimageQuest.recentEvents.shift();
+  enqueueBridgeEvent(type, extra);
+}
+
+function showQuestStatus(message) {
+  if (!pilgrimageQuest.statusEl) return;
+  pilgrimageQuest.statusEl.textContent = message;
+  pilgrimageQuest.statusEl.classList.add('show');
+  setTimeout(() => pilgrimageQuest.statusEl?.classList.remove('show'), 1700);
+}
+
+function showQuestCompletionBanner() {
+  if (!pilgrimageQuest.completionBannerEl) return;
+  if (pilgrimageQuest.completionBannerTimer) clearTimeout(pilgrimageQuest.completionBannerTimer);
+  pilgrimageQuest.completionBannerEl.classList.add('show');
+  pilgrimageQuest.completionBannerTimer = setTimeout(() => {
+    pilgrimageQuest.completionBannerEl?.classList.remove('show');
+  }, 2600);
+}
+
+function setBeaconVisualState(beacon, nextState) {
+  if (!beacon || beacon.state === nextState) return;
+  beacon.state = nextState;
+
+  if (!beacon.core?.material || !beacon.beam?.material) return;
+
+  const coreMaterial = beacon.core.material;
+  const beamMaterial = beacon.beam.material;
+
+  if (nextState === 'active') {
+    coreMaterial.color.setHex(0xa2e3ff);
+    coreMaterial.emissive.setHex(0x3a91ff);
+    coreMaterial.emissiveIntensity = 1.2;
+    beamMaterial.color.setHex(0x9be2ff);
+    beamMaterial.opacity = 0.62;
+    beacon.beam.visible = true;
+  } else if (nextState === 'completed') {
+    coreMaterial.color.setHex(0xb7ffd2);
+    coreMaterial.emissive.setHex(0x2ea76a);
+    coreMaterial.emissiveIntensity = 0.95;
+    beamMaterial.color.setHex(0x65ffad);
+    beamMaterial.opacity = 0.32;
+    beacon.beam.visible = true;
+  } else {
+    coreMaterial.color.setHex(0x7692b8);
+    coreMaterial.emissive.setHex(0x253f63);
+    coreMaterial.emissiveIntensity = 0.38;
+    beamMaterial.color.setHex(0x5672a0);
+    beamMaterial.opacity = 0.12;
+    beacon.beam.visible = false;
+  }
+}
+
+function getActiveBeacon() {
+  if (!pilgrimageQuest.activeObjectiveId) return null;
+  return pilgrimageQuest.beacons.find((beacon) => beacon.id === pilgrimageQuest.activeObjectiveId) || null;
+}
+
+function syncBeaconQuestPhase() {
+  const completed = pilgrimageQuest.completedObjectiveIds.length;
+  pilgrimageQuest.progress = completed / BEACON_LAYOUT.length;
+
+  if (completed >= BEACON_LAYOUT.length) {
+    pilgrimageQuest.phase = 'completed';
+    pilgrimageQuest.activeObjectiveId = null;
+  } else {
+    const nextBeacon = BEACON_LAYOUT[completed];
+    pilgrimageQuest.phase = nextBeacon.id;
+    pilgrimageQuest.activeObjectiveId = nextBeacon.id;
+  }
+
+  pilgrimageQuest.beacons.forEach((beacon) => {
+    if (pilgrimageQuest.completedObjectiveIds.includes(beacon.id)) setBeaconVisualState(beacon, 'completed');
+    else if (beacon.id === pilgrimageQuest.activeObjectiveId) setBeaconVisualState(beacon, 'active');
+    else setBeaconVisualState(beacon, 'inactive');
+  });
+
+  updateObjectiveHud();
+}
+
+function startBeaconQuest() {
+  pilgrimageQuest.phase = 'intro';
+  pilgrimageQuest.activeObjectiveId = BEACON_LAYOUT[0]?.id || null;
+  pilgrimageQuest.completedObjectiveIds = [];
+  pilgrimageQuest.progress = 0;
+  pilgrimageQuest.recentEvents.length = 0;
+  syncBeaconQuestPhase();
+  rememberQuestEvent('objective_started', {
+    objectiveId: pilgrimageQuest.activeObjectiveId,
+    phase: pilgrimageQuest.phase,
+    progress: pilgrimageQuest.progress
+  });
+}
+
+function createBeaconQuestUi() {
+  pilgrimageQuest.promptEl = document.createElement('div');
+  pilgrimageQuest.promptEl.id = 'interaction-prompt';
+  pilgrimageQuest.promptEl.textContent = 'Approach the active beacon and press E to attune';
+  document.body.appendChild(pilgrimageQuest.promptEl);
+
+  pilgrimageQuest.statusEl = document.createElement('div');
+  pilgrimageQuest.statusEl.id = 'interaction-status';
+  document.body.appendChild(pilgrimageQuest.statusEl);
+
+  pilgrimageQuest.objectiveHudEl = document.createElement('div');
+  pilgrimageQuest.objectiveHudEl.id = 'objective-hud';
+  document.body.appendChild(pilgrimageQuest.objectiveHudEl);
+
+  pilgrimageQuest.completionBannerEl = document.createElement('div');
+  pilgrimageQuest.completionBannerEl.id = 'quest-complete-banner';
+  pilgrimageQuest.completionBannerEl.textContent = 'Pilgrimage Complete';
+  document.body.appendChild(pilgrimageQuest.completionBannerEl);
+}
+
+function createBeaconPilgrimageQuest() {
+  pilgrimageQuest.beacons = BEACON_LAYOUT.map(createBeacon);
+  createBeaconQuestUi();
+  startBeaconQuest();
 
   modeHud.el = document.createElement('div');
   modeHud.el.id = 'mode-hud';
@@ -1324,40 +1530,155 @@ function createInteractable() {
   updateChunkHud();
 }
 
-function updateInteractionUI(canInteract) {
-  if (!interactable.promptEl) return;
-  interactable.promptEl.style.opacity = canInteract ? '1' : '0';
-  interactable.promptEl.style.transform = canInteract ? 'translate(-50%, 0)' : 'translate(-50%, 6px)';
+function getNearestBeaconInRange() {
+  if (!player || pilgrimageQuest.beacons.length === 0) return null;
+
+  let best = null;
+  for (const beacon of pilgrimageQuest.beacons) {
+    const dist = player.position.distanceTo(beacon.mesh.position);
+    if (dist <= pilgrimageQuest.radius && (!best || dist < best.dist)) {
+      best = { beacon, dist };
+    }
+  }
+  return best;
 }
 
-function triggerInteraction() {
-  if (!interactable.mesh || !interactable.statusEl) return;
+function updateInteractionUI() {
+  if (!pilgrimageQuest.promptEl) return;
 
-  interactable.activated = !interactable.activated;
-  const orb = interactable.mesh.children[0];
-  if (orb?.material) {
-    orb.material.color.setHex(interactable.activated ? 0xb5ffc8 : 0x9ed6ff);
-    orb.material.emissive.setHex(interactable.activated ? 0x2b965f : 0x4b7fd3);
+  const nearby = getNearestBeaconInRange();
+  if (!nearby) {
+    pilgrimageQuest.promptEl.style.opacity = '0';
+    pilgrimageQuest.promptEl.style.transform = 'translate(-50%, 6px)';
+    return;
   }
 
-  interactable.statusEl.textContent = interactable.activated
-    ? 'Orb attuned. Ancient mechanism hums to life.'
-    : 'Orb calms down.';
-  interactable.statusEl.classList.add('show');
-  setTimeout(() => interactable.statusEl?.classList.remove('show'), 1400);
-  enqueueBridgeEvent('interaction', {
-    targetId: interactable.agentId,
-    result: interactable.activated ? 'activated' : 'deactivated'
-  });
+  const activeBeacon = getActiveBeacon();
+  if (nearby.beacon.id === activeBeacon?.id) {
+    pilgrimageQuest.promptEl.textContent = `Press E to attune ${nearby.beacon.label}`;
+  } else if (pilgrimageQuest.phase === 'completed') {
+    pilgrimageQuest.promptEl.textContent = `${nearby.beacon.label} is already attuned`;
+  } else {
+    pilgrimageQuest.promptEl.textContent = `${nearby.beacon.label} is dormant. Follow the active beam.`;
+  }
+
+  pilgrimageQuest.promptEl.style.opacity = '1';
+  pilgrimageQuest.promptEl.style.transform = 'translate(-50%, 0)';
 }
 
-function tryTriggerInteraction(targetId = interactable.agentId) {
-  if (!player || !interactable.mesh) return false;
-  const distance = player.position.distanceTo(interactable.mesh.position);
-  if (distance > interactable.radius) return false;
-  if (targetId && targetId !== interactable.agentId) return false;
-  triggerInteraction();
+function updateObjectiveHud() {
+  if (!pilgrimageQuest.objectiveHudEl) return;
+
+  if (pilgrimageQuest.phase === 'completed') {
+    pilgrimageQuest.objectiveHudEl.textContent = 'Objective: Pilgrimage complete · 3/3 beacons attuned';
+    pilgrimageQuest.objectiveHudEl.classList.add('complete');
+    return;
+  }
+
+  pilgrimageQuest.objectiveHudEl.classList.remove('complete');
+  const activeBeacon = getActiveBeacon();
+  const completed = pilgrimageQuest.completedObjectiveIds.length;
+  pilgrimageQuest.objectiveHudEl.textContent = `Objective: Attune ${activeBeacon?.label || 'next beacon'} · ${completed}/3 complete`;
+}
+
+function completeActiveBeacon(beacon) {
+  if (!beacon || pilgrimageQuest.completedObjectiveIds.includes(beacon.id)) return;
+
+  pilgrimageQuest.completedObjectiveIds.push(beacon.id);
+  rememberQuestEvent('objective_completed', {
+    objectiveId: beacon.id,
+    progress: Number((pilgrimageQuest.completedObjectiveIds.length / BEACON_LAYOUT.length).toFixed(3))
+  });
+
+  const before = pilgrimageQuest.activeObjectiveId;
+  syncBeaconQuestPhase();
+
+  showQuestStatus(`${beacon.label} attuned.`);
+  enqueueBridgeEvent('interaction', {
+    targetId: beacon.id,
+    result: 'attuned'
+  });
+
+  if (pilgrimageQuest.phase === 'completed') {
+    rememberQuestEvent('quest_completed', {
+      objectiveId: beacon.id,
+      progress: pilgrimageQuest.progress
+    });
+    showQuestCompletionBanner();
+    showQuestStatus('All beacons aligned. Pilgrimage complete.');
+  } else if (before !== pilgrimageQuest.activeObjectiveId) {
+    rememberQuestEvent('objective_started', {
+      objectiveId: pilgrimageQuest.activeObjectiveId,
+      phase: pilgrimageQuest.phase,
+      progress: pilgrimageQuest.progress
+    });
+    const nextBeacon = getActiveBeacon();
+    if (nextBeacon) showQuestStatus(`${beacon.label} attuned. ${nextBeacon.label} is now active.`);
+  }
+}
+
+function tryTriggerInteraction(targetId = null) {
+  if (!player) return false;
+
+  const targetBeacon = targetId
+    ? pilgrimageQuest.beacons.find((beacon) => beacon.id === targetId)
+    : getNearestBeaconInRange()?.beacon;
+  if (!targetBeacon) return false;
+
+  const distance = player.position.distanceTo(targetBeacon.mesh.position);
+  if (distance > pilgrimageQuest.radius) return false;
+
+  if (pilgrimageQuest.phase === 'completed') {
+    showQuestStatus('The pilgrimage is already complete.');
+    enqueueBridgeEvent('interaction', {
+      targetId: targetBeacon.id,
+      result: 'already_completed'
+    });
+    return true;
+  }
+
+  if (targetBeacon.id !== pilgrimageQuest.activeObjectiveId) {
+    showQuestStatus(`${targetBeacon.label} rejects attunement. Follow the active beacon.`);
+    rememberQuestEvent('rejected', {
+      objectiveId: targetBeacon.id,
+      expectedObjectiveId: pilgrimageQuest.activeObjectiveId,
+      progress: pilgrimageQuest.progress,
+      reason: 'out_of_order'
+    });
+    enqueueBridgeEvent('interaction', {
+      targetId: targetBeacon.id,
+      result: 'rejected_out_of_order'
+    });
+    return true;
+  }
+
+  completeActiveBeacon(targetBeacon);
   return true;
+}
+
+function updateBeaconVisuals() {
+  const t = clock.elapsedTime;
+
+  pilgrimageQuest.beacons.forEach((beacon, index) => {
+    if (!beacon.core) return;
+    const pulse = Math.sin(t * (2.1 + index * 0.35)) * 0.5 + 0.5;
+
+    if (beacon.state === 'active') {
+      beacon.core.position.y = beacon.baseCoreY + pulse * 0.09;
+      beacon.core.material.emissiveIntensity = 0.95 + pulse * 0.55;
+      beacon.beam.material.opacity = 0.4 + pulse * 0.35;
+      beacon.beam.visible = true;
+    } else if (beacon.state === 'completed') {
+      beacon.core.position.y = beacon.baseCoreY + Math.sin(t * 1.3 + index) * 0.025;
+      beacon.core.material.emissiveIntensity = 0.72 + pulse * 0.18;
+      beacon.beam.material.opacity = 0.22 + pulse * 0.14;
+      beacon.beam.visible = true;
+    } else {
+      beacon.core.position.y = beacon.baseCoreY + Math.sin(t * 0.9 + index) * 0.018;
+      beacon.core.material.emissiveIntensity = 0.25 + pulse * 0.12;
+      beacon.beam.visible = false;
+    }
+  });
 }
 
 function updateModeHud() {
@@ -1402,7 +1723,7 @@ function onKey(isDown, e) {
     if (actions.jump) setAction('jump', 0.08);
   }
 
-  if (isDown && e.code === 'KeyE' && player && interactable.mesh) {
+  if (isDown && e.code === 'KeyE' && player) {
     tryTriggerInteraction();
   }
 
@@ -1471,18 +1792,8 @@ function updatePlayer(delta) {
     player.position.y = groundedY;
   }
 
-  if (interactable.mesh) {
-    const distance = player.position.distanceTo(interactable.mesh.position);
-    const canInteract = distance <= interactable.radius;
-    updateInteractionUI(canInteract);
-
-    const orb = interactable.mesh.children[0];
-    if (orb) {
-      const t = clock.elapsedTime;
-      orb.position.y = 0.42 + Math.sin(t * 2.2) * 0.06;
-      orb.material.emissiveIntensity = interactable.activated ? 1.05 : 0.65 + (Math.sin(t * 4.4) + 1) * 0.12;
-    }
-  }
+  updateInteractionUI();
+  updateBeaconVisuals();
 
   if (agentBridge.consumeOneShotInteract(nowMs)) {
     tryTriggerInteraction();
@@ -1490,10 +1801,11 @@ function updatePlayer(delta) {
 
   const queuedInteract = agentBridge.consumeInteractRequest();
   if (queuedInteract) {
-    const ok = tryTriggerInteraction(queuedInteract.targetId);
+    const interactionTargetId = queuedInteract.targetId || pilgrimageQuest.activeObjectiveId || null;
+    const ok = tryTriggerInteraction(interactionTargetId);
     agentBridge.send({
       type: 'INTERACTED',
-      targetId: queuedInteract.targetId || interactable.agentId,
+      targetId: interactionTargetId || 'beacon_unknown',
       result: ok ? 'ok' : 'out_of_range'
     });
   }
@@ -1530,6 +1842,7 @@ function updateBridge(nowMs) {
       heading: lastMoveHeading,
       stuck: bridgeStuckCounter > 8,
       events: bridgeEvents.splice(0, bridgeEvents.length),
+      objective: getObjectiveSnapshot(),
       perceivableRoots: bridgePerceivableRoots,
       occluders: bridgeOccluders,
       latestPerceivedIds: bridgeLatestPerceivedIds
@@ -1629,8 +1942,8 @@ window.addEventListener('resize', () => {
 
   try {
     agentBridge.connect();
-    createInteractable();
-    markBootStage('coreUiReady', 'HUD + interactable created');
+    createBeaconPilgrimageQuest();
+    markBootStage('coreUiReady', 'HUD + beacon quest created');
 
     // Start rendering immediately so world/terrain still appears even if character load is slow.
     ensureRenderLoopStarted('post-core-ui');
