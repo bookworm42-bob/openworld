@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T22:26:44.094Z",
+  "updatedAt": "2026-02-26T22:30:52.343Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -22,6 +22,16 @@
       "owner": "playtester",
       "notes": "Playtest pass: handoff primary run (ROAM_SEED=404) reached quest_completed with healthy ACT loop and expected collision/nav recovery telemetry.",
       "updatedAt": "2026-02-26T22:26:44.093Z"
+    },
+    {
+      "taskId": "task-2026-02-26T22-30-52-343Z-1",
+      "cycleId": "2026-02-26T22-30-52-343Z",
+      "title": "Beacon attunement encounter polish (lock-on approach + progression feedback)",
+      "status": "proposed",
+      "createdAt": "2026-02-26T22:30:52.343Z",
+      "deadlineAt": "2026-02-27T13:30:52.343Z",
+      "owner": "executor",
+      "notes": "Deliver close-range beacon interaction reliability + clearer attunement feedback; remove in-range orbit/stall behavior while keeping collision solidity."
     }
   ]
 }

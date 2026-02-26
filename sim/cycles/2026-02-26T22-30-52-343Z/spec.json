@@ -1,0 +1,32 @@
+{
+  "cycleId": "2026-02-26T22-30-52-343Z",
+  "vision": "Beacon pilgrimage interactions feel intentional and readable: approaching an active beacon no longer causes orbit/stall behavior, attunement feedback is immediate and satisfying, and both players and agents get clear guidance for clean sequential completion.",
+  "objectives": [
+    "Implement an attunement-approach layer so the active beacon has a stable \"docking\" interaction zone (no repeated micro-collisions/orbiting when the player is already in range).",
+    "Improve close-range navigation quality around beacons by tuning local collision behavior and movement damping near the active objective while preserving global world solidity.",
+    "Add stronger gameplay feedback for objective transitions (approach lock, attunement pulse, next objective cue) so progression reads clearly without relying on logs.",
+    "Expose approach/attunement state in OBS/events so controller scripts can make reliable last-meter decisions instead of timing-based interact spam.",
+    "Validate with seeded pilgrimage runs that complete all three beacons without prolonged (>3s) in-range hesitation at any objective."
+  ],
+  "implementationHints": [
+    "Treat this as one cohesive encounter-polish pass: movement feel, interaction trigger reliability, and progression feedback should land together.",
+    "Keep bridge payload backward compatible by adding optional fields/events only.",
+    "Preserve deterministic behavior for playtest reproducibility (avoid non-deterministic timers without seeded handling)."
+  ],
+  "implementationDetails": [
+    "In src/main.js (or extracted helper module), introduce an active-beacon approach state machine with at least: far -> approach -> lock -> attune. Compute lock using distance + facing constraints and a short stability window.",
+    "Add per-beacon close-range motion tuning: when the active objective is within a configurable near radius, reduce forward overshoot and bias slide resolution to prevent circular orbiting around collider edges.",
+    "Revisit beacon collider tuning for active vs inactive beacons (or add an inner interaction proxy) so physical blocking remains believable but does not trap the player at the exact attune distance.",
+    "Add visible progression feedback: objective lock indicator, attunement pulse burst, and explicit next-beacon cue after completion (HUD + world-space signal). Keep visuals lightweight and style-consistent.",
+    "Extend objective snapshot/bridge events with approach metadata (example: approachPhase, lockStableMs, canAttune, activeBeaconDist, activeBeaconBearing) and events (example: objective_lock_acquired, objective_lock_lost, attunement_started).",
+    "Update scripts/playtest-beacon-pilgrimage.mjs to consume the new metadata/events for last-meter control (e.g., slow-turn alignment before interact, lock-aware retry), while preserving compatibility fallback when fields are absent.",
+    "Validation before handoff: npm run build passes; run at least 4 seeded pilgrimage runs (including ROAM_SEED=404) with AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs; each run must reach quest_completed and show no >3s lock hesitation once in attune radius.",
+    "Capture evidence in exec_result.json with commands + log lines for lock/attunement transitions, and include at least one screenshot-enabled run to visually confirm improved close-range behavior."
+  ],
+  "taskId": "task-2026-02-26T22-30-52-343Z-1",
+  "playtest": {
+    "type": "agent",
+    "durationSec": 180,
+    "capture": true
+  }
+}

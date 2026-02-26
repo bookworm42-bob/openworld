@@ -106,3 +106,8 @@ Delta update (2026-02-26T21:59Z):
 - Current major gameplay/physics gap is world solidity: player movement still has no static collision resolution against trees/rocks/landmarks/beacons, so clipping remains possible and contributes to intermittent no-progress navigation stalls.
 - Opened cycle `2026-02-26T21-59-26-246Z` to deliver a comprehensive collision + collision-aware navigation robustness pass as the next gameplay-quality milestone.
 
+Delta update (2026-02-26T22:30Z):
+- Verified collision layer is now implemented in source (`src/collision.js` + integration in `src/main.js`) and latest playtest cycle passed with collision/nav telemetry active (`sensors.nav`, collision/nav_recovery events).
+- New top gameplay quality gap has shifted to close-range interaction feel: active beacon attunement still shows occasional in-range hesitation/orbit behavior before completion, and progression feedback is more log-visible than moment-to-moment game-readable.
+- Opened cycle `2026-02-26T22-30-52-343Z` for a cohesive attunement encounter polish pass (lock-on approach reliability, near-objective movement tuning, and stronger objective transition feedback + OBS metadata).
+
