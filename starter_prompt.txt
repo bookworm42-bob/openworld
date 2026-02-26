@@ -29,7 +29,7 @@ Schedule required:
    - Schedule: run in `5m`
    - `delete-after-run = true`
    - `thinking = high`
-   - `timeout-seconds = 1800`
+   - `timeoutSeconds = 1800`
    - Message payload from file:
      - `outside-simulator.txt`
 
@@ -40,9 +40,13 @@ Schedule required:
    - Wake mode: `now`
    - Schedule: every `10m`
    - `thinking = medium`
-   - `timeout-seconds = 1800`
+   - `timeoutSeconds = 1800`
    - Message payload from file:
      - `timeout-monitor.txt`
+
+Key format rule:
+- If using CLI flags: use `--timeout-seconds 1800`.
+- If using JSON/tool payload fields: use `timeoutSeconds: 1800`.
 
 Validation required:
 1. List enabled cron jobs.

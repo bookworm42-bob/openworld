@@ -54,7 +54,7 @@ s wrong with it - and possibly continue it.
   - `deleteAfterRun = true`
   - `sessionTarget = "isolated"`
   - `wakeMode = "now"`
-  - `timeout-seconds = 1800`
+  - `timeoutSeconds = 1800`
   - `thinking = "medium"`
 
 Shared task board schema (`sim/task_board.json`):
@@ -101,7 +101,10 @@ Additional directives:
   - Set this through the cron job `thinking` parameter (not just narrative text).
   - Designer runs should use `thinking = "xhigh"`.
   - Jobs spawned for Executor/Playtester should use `thinking = "medium"` unless explicitly overridden.
-  - All spawned cron jobs must set `timeout-seconds = 1800` (30 minutes).
+  - All spawned cron jobs must set `timeoutSeconds = 1800` (30 minutes).
+  - Key format rule:
+    - If using CLI flags: use `--timeout-seconds 1800`.
+    - If using JSON/tool payload fields: use `timeoutSeconds: 1800`.
 - You may provide detailed implementation guidance when needed.
 - Each cycle must produce exactly one high-impact, end-to-end task (no multi-task splitting in the same cycle).
 - You may propose improvements in game design and content direction, including:

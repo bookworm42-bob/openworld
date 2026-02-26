@@ -89,10 +89,13 @@ Recovery contract:
   - `deleteAfterRun = true`
   - `sessionTarget = "isolated"`
   - `wakeMode = "now"`
-  - `timeout-seconds = 1800`
+  - `timeoutSeconds = 1800`
   - thinking:
     - `high` for Designer recovery
     - `medium` for Executor recovery
+  - Key format rule:
+    - If using CLI flags: use `--timeout-seconds 1800`.
+    - If using JSON/tool payload fields: use `timeoutSeconds: 1800`.
 
 7. Prevent duplicate active jobs:
 - Before creating the recovery job, disable/remove other enabled jobs named:

@@ -99,10 +99,13 @@ For any cron job you create above, use one-off settings explicitly:
 - `deleteAfterRun = true`
 - `sessionTarget = "isolated"`
 - `wakeMode = "now"`
-- `timeout-seconds = 1800`
+- `timeoutSeconds = 1800`
 - Set via cron job `thinking` parameter
 - `thinking = "medium"` for `Prompt B (Executor)` and `Prompt C (Playtester)`
 - `thinking = "xhigh"` for `Prompt A (Designer)`
+- Key format rule:
+  - If using CLI flags: use `--timeout-seconds 1800`.
+  - If using JSON/tool payload fields: use `timeoutSeconds: 1800`.
 
 Always delete your own one-off `Prompt C (Playtester)` cron job before stopping.
 
