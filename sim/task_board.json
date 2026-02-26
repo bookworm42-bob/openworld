@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T22:09:15.972Z",
+  "updatedAt": "2026-02-26T22:26:44.094Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -16,12 +16,12 @@
       "taskId": "task-2026-02-26T21-59-26-246Z-1",
       "cycleId": "2026-02-26T21-59-26-246Z",
       "title": "Solid-world collision and collision-aware pilgrimage navigation",
-      "status": "implemented",
+      "status": "tested",
       "createdAt": "2026-02-26T21:59:26.246Z",
       "deadlineAt": "2026-02-27T12:59:26.246Z",
-      "owner": "executor",
-      "notes": "Implemented static world collisions, collision telemetry in OBS/events, and collision-aware pilgrimage playtest behavior. Executor self-tests passed across ROAM_SEED=101/202/303.",
-      "updatedAt": "2026-02-26T22:09:15.972Z"
+      "owner": "playtester",
+      "notes": "Playtest pass: handoff primary run (ROAM_SEED=404) reached quest_completed with healthy ACT loop and expected collision/nav recovery telemetry.",
+      "updatedAt": "2026-02-26T22:26:44.093Z"
     }
   ]
 }

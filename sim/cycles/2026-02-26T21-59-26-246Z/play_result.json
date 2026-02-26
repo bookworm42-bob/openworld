@@ -1,0 +1,30 @@
+{
+  "cycleId": "2026-02-26T21-59-26-246Z",
+  "taskId": "task-2026-02-26T21-59-26-246Z-1",
+  "status": "pass",
+  "summary": "Primary handoff validation command passed: pilgrimage quest completed with collision and nav recovery telemetry active, and control loop remained healthy without stalls.",
+  "runConfig": {
+    "script": "scripts/playtest-beacon-pilgrimage.mjs",
+    "runSec": 180,
+    "captureEverySec": 10
+  },
+  "observations": [
+    "[OPEN] connected and [OBS] first observation received early in run.",
+    "Continuous [ACT] stream observed throughout objective progression with objective/search modes and no control-loop dropouts.",
+    "Mission flow completed in sequence: objective_completed beacon_1, beacon_2, beacon_3, then quest_completed progress=1.",
+    "Collision telemetry/events triggered and recovered as expected (collision, collision_resolved, nav_recovery), including tower-near and beacon colliders.",
+    "Run exited on [SUCCESS] quest_completed observed; finishing run."
+  ],
+  "metrics": {
+    "runSec": 35,
+    "captureEverySec": 10,
+    "screenshotCount": 0,
+    "obsReceived": true,
+    "actLoopHealthy": true
+  },
+  "issues": [],
+  "nextRecommendations": [
+    "Optional confidence sweep: replay seeds 101/202/303 plus one additional random seed under the same script.",
+    "For visual-only verification of slide quality around dense props, run once with screenshots enabled."
+  ]
+}
