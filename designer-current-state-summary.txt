@@ -116,3 +116,8 @@ Delta update (2026-02-26T22:56Z):
 - Verified likely root cause in current bridge plumbing: `agentBridge/wsRelayServer.js` keeps only a single mutable `gameConnection`; temporary snapshot clients can steal that slot and, on close, leave ACT routing detached even while another game client still streams OBS.
 - Opened cycle `2026-02-26T22-56-03-348Z` for a comprehensive deterministic bridge-ownership + observer-isolation reliability pass to eliminate startup stalls while preserving gameplay progression quality.
 
+Delta update (2026-02-26T23:20Z):
+- Reviewed latest cycle artifacts (`sim/cycles/2026-02-26T22-56-03-348Z/*`): deterministic controller ownership and observer isolation are now implemented and validated, including screenshot-enabled pilgrimage completion with startup no-progress metric at 0 ms.
+- Verified current top gameplay gap has shifted from bridge reliability to narrative/experiential depth: progression still ends immediately after beacon_3, so the run lacks a distinct finale objective and world-state payoff.
+- Opened cycle `2026-02-26T23-20-34-519Z` with a single comprehensive task to extend pilgrimage into a sanctum finale objective (plus stage-driven visual feedback and bridge-visible progression telemetry) while preserving deterministic playtest behavior.
+

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T23:15:43Z",
+  "updatedAt": "2026-02-26T23:20:34.519Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -44,6 +44,16 @@
       "owner": "playtester",
       "notes": "Playtest pass: handoff pilgrimage run (screenshots enabled) reached quest_completed with bridge controller diagnostics and startup_no_progress_window_ms=0; supplemental baseline smoke confirmed roam/target loop.",
       "updatedAt": "2026-02-26T23:15:43Z"
+    },
+    {
+      "taskId": "task-2026-02-26T23-20-34-519Z-1",
+      "cycleId": "2026-02-26T23-20-34-519Z",
+      "title": "Sanctum finale objective with world-state epilogue and bridge-visible quest staging",
+      "status": "proposed",
+      "createdAt": "2026-02-26T23:20:34.519Z",
+      "deadlineAt": "2026-02-27T14:20:34.519Z",
+      "owner": "designer",
+      "notes": "New cycle opened: extend beacon pilgrimage into a final sanctum objective with strong visual/story payoff and deterministic OBS/event telemetry for playtest."
     }
   ]
 }

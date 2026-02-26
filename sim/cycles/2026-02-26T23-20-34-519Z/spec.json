@@ -1,0 +1,34 @@
+{
+  "cycleId": "2026-02-26T23-20-34-519Z",
+  "vision": "Beacon pilgrimage now lands in a real finale: after the three beacon attunements, the world opens a sanctum objective with clear visual guidance, players travel to the finale point, perform the closing attunement, and receive an unmistakable end-of-run payoff that is also machine-verifiable in OBS/events.",
+  "objectives": [
+    "Extend progression from 3-beacon completion into a fourth, distinct finale objective (sanctum attunement) so the run has a stronger narrative arc than an immediate quest end at beacon_3.",
+    "Introduce visible world-state transitions tied to progression stages (pilgrimage active -> sanctum unlocked -> finale completed), improving moment-to-moment readability without relying on logs.",
+    "Keep navigation/control quality robust during the finale leg: active objective guidance, interact gating, and collision-aware approach should remain deterministic and stall-resistant.",
+    "Expose finale-specific state + events in OBS/objective payloads so playtest scripts can assert progression quality and completion criteria from telemetry.",
+    "Validate with seeded pilgrimage runs (including screenshot-enabled mode) that all stages complete end-to-end within run budget and produce clear visual proof."
+  ],
+  "implementationHints": [
+    "Treat this as one cohesive gameplay-quality pass (quest design + visual feedback + telemetry + playtest script adaptation), not independent micro-patches.",
+    "Reuse existing world geometry/landmarks where possible (e.g., windmill/ruins area) and keep asset footprint light; prioritize mechanics/readability over heavy new content imports.",
+    "Keep bridge payload changes backward compatible by adding optional fields/events rather than renaming/removing existing keys consumed by current scripts."
+  ],
+  "implementationDetails": [
+    "In src/main.js, extend pilgrimage quest state machine to include explicit stages (for example: beacons_active, sanctum_unlocked, finale_attuning, finale_completed). Do not immediately fire quest_completed on beacon_3; instead transition to sanctum objective.",
+    "Author one finale interactable/sanctum anchor in-world (new mesh group or adapted landmark child) with deterministic id/tag (e.g., sanctum_core) registered as perceivable + collider-aware where appropriate.",
+    "When sanctum unlocks, provide clear world feedback: objective HUD copy update, transient cue banner, and at least one world-space signal (beam/ring/light pulse/path marker) visible in screenshots and while moving.",
+    "Add a lightweight world-state grade shift (fog/lighting/emissive accents) that reacts to stage transitions but preserves gameplay readability and character silhouette contrast.",
+    "Extend interaction logic so sanctum attunement follows stable lock/interaction rules similar to beacon lock quality (no interact spam dependency, no instant completion from far range).",
+    "Update objective snapshot contract (getObjectiveSnapshot/bridge payload) with finale metadata such as questStage, finaleObjectiveId, finaleUnlocked, and finale completion progress while preserving existing guidance fields.",
+    "Emit explicit progression events for telemetry (examples: finale_unlocked, finale_started, finale_completed) alongside existing objective events so script/log validation can assert stage boundaries.",
+    "Update scripts/playtest-beacon-pilgrimage.mjs to validate the new terminal condition (finale_completed / updated quest completion event), while remaining resilient if optional fields are absent.",
+    "Validation before handoff: npm run build passes; run at least two seeded end-to-end runs with AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs (one normal + one screenshot-enabled) on isolated DEV_PORT/BRIDGE_PORT pairs; both must reach finale completion without startup stall regressions.",
+    "Record evidence in exec_result.json and playtest_handoff.txt: exact commands, key stage-transition log lines, and screenshot artifact paths that visibly show sanctum unlock/finale completion cues."
+  ],
+  "taskId": "task-2026-02-26T23-20-34-519Z-1",
+  "playtest": {
+    "type": "agent",
+    "durationSec": 180,
+    "capture": true
+  }
+}
