@@ -1,16 +1,16 @@
 {
-  "updatedAt": "2026-02-26T21:48:57.513Z",
+  "updatedAt": "2026-02-26T21:56:21.308Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
       "cycleId": "2026-02-26T21-38-34-744Z",
       "title": "Beacon pilgrimage quest with sequential world interactions",
-      "status": "implemented",
+      "status": "tested",
       "createdAt": "2026-02-26T21:38:34.744Z",
       "deadlineAt": "2026-02-27T12:38:34.744Z",
-      "owner": "executor",
-      "notes": "Implement a complete 3-beacon quest loop with bridge-visible objective state and playtestable completion path.",
-      "updatedAt": "2026-02-26T21:48:57.513Z"
+      "owner": "playtester",
+      "notes": "Playtest pass: quest_completed observed; baseline roam/target regression check passed.",
+      "updatedAt": "2026-02-26T21:56:21.308Z"
     }
   ]
 }
