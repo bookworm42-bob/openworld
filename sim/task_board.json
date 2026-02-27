@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-27T01:05:30Z",
+  "updatedAt": "2026-02-27T01:11:15.086Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -77,6 +77,16 @@
       "owner": "playtester",
       "notes": "Playtest pass: handoff primary run (seed 404, screenshots enabled) reached return_completed + pilgrimage_cycle_completed with startup_no_progress_window_ms=0; supplemental 45s baseline smoke confirmed stable roam/target ACT loop.",
       "updatedAt": "2026-02-27T01:05:30Z"
+    },
+    {
+      "taskId": "task-2026-02-27T01-11-15-086Z-1",
+      "cycleId": "2026-02-27T01-11-15-086Z",
+      "title": "Epilogue anomaly pressure pass (chasing hazard + readable urgency)",
+      "status": "proposed",
+      "createdAt": "2026-02-27T01:11:15.086Z",
+      "deadlineAt": "2026-02-27T16:11:15.086Z",
+      "owner": "designer",
+      "notes": "Proposed cycle: add deterministic return-leg pursuit pressure and telemetry so epilogue urgency is gameplay-real, not timer-only."
     }
   ]
 }

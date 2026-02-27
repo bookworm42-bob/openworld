@@ -1,0 +1,34 @@
+{
+  "cycleId": "2026-02-27T01-11-15-086Z",
+  "vision": "The return leg stops feeling like a long autopilot jog and becomes a tense, readable escape sequence: once the sanctum is attuned, a deterministic anomaly front advances from behind, forcing purposeful movement while preserving fair, completable runs.",
+  "objectives": [
+    "Introduce an epilogue pressure mechanic (anomaly pursuit) that materially changes return-leg decision-making instead of relying on timer text alone.",
+    "Add clear world/HUD feedback for pressure state (hazard proximity, warning tiers, and contact penalties) so urgency is both visible and actionable.",
+    "Expose additive bridge/objective telemetry for pressure mechanics (hazard active/proximity/contacts/warnings) without breaking existing OBS consumers.",
+    "Upgrade pilgrimage playtest behavior to validate pressure-state signals and fail on unsafe regressions (return_failed, repeated hazard contacts, missing pressure telemetry).",
+    "Keep deterministic completion quality across seeded runs while ensuring at least one meaningful pressure warning appears during normal epilogue flow."
+  ],
+  "implementationHints": [
+    "Treat this as gameplay tension + readability polish, not just a timer tweak: players should feel chased, not merely timed.",
+    "Keep hazard behavior deterministic and seed-stable so executor/playtester evidence remains reproducible.",
+    "Use additive fields/events for compatibility with existing automation and dashboards."
+  ],
+  "implementationDetails": [
+    "In src/main.js, add a dedicated epilogue pressure runtime (for example anomalyFront) that activates on return_started and deactivates on return_completed/return_failed/reset.",
+    "Author a visible anomaly actor/effect (mesh + light/fog pulse + route-aware positioning) that advances from the sanctum toward the player/return lane at deterministic speed; it should be readable from third-person camera without obscuring objective markers.",
+    "Define hazard proximity bands (safe/warning/critical/contact) and emit bridge events such as return_pressure_warning, return_pressure_critical, and return_pressure_contact with objectiveId, hazardDist, and returnTimeRemainingSec.",
+    "Apply fair, non-random contact consequences (for example short movement slow, timer penalty, or lock reset) with cooldown to avoid infinite stun loops; log applied penalty values in events.",
+    "Update epilogue HUD/objective HUD copy to include live pressure state (distance/critical status) so manual players can react without reading console logs.",
+    "Extend objective snapshot payload additively with fields like pressureActive, pressureLevel, pressureDist, pressureContacts, pressurePenaltySecTotal, and pressureWarningsTriggered while preserving existing keys.",
+    "Update scripts/playtest-beacon-pilgrimage.mjs so the controller recognizes pressure telemetry and biases movement away from imminent contact (while still pursuing objective), then fails loudly if pressure fields are missing, return_failed fires, or pressure contact count exceeds configured threshold.",
+    "Add log metrics for epilogue pressure quality (for example min_pressure_dist, pressure_warning_count, pressure_contact_count, pressure_penalty_sec_total) alongside existing startup/lock/cycle metrics.",
+    "Validation before handoff: npm run build; seeded runs ROAM_SEED=404/505/606 with AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs and RUN_SEC long enough for full cycle under pressure; one screenshot-enabled isolated-port run proving hazard readability and non-blank captures.",
+    "Record evidence in sim/cycles/<cycleId>/exec_result.json and playtest_handoff.txt: exact commands, pressure telemetry/events observed, penalty behavior, pass/fail thresholds used, and screenshot paths."
+  ],
+  "taskId": "task-2026-02-27T01-11-15-086Z-1",
+  "playtest": {
+    "type": "agent",
+    "durationSec": 210,
+    "capture": true
+  }
+}

@@ -130,3 +130,9 @@ Delta update (2026-02-27T00:24Z):
 - Reviewed latest cycle artifacts (`sim/cycles/2026-02-26T23-44-19-565Z/*`) plus current source (`src/main.js`, `scripts/playtest-beacon-pilgrimage.mjs`): pacing/route handoff regressions are fixed and seeded validations now pass with lockToAttuneMs within threshold and startup_no_progress_window_ms=0.
 - New top gameplay-quality gap has shifted to end-of-run payoff and replayable loop depth: the experience still hard-stops immediately after sanctum attunement, so players/agents get no return-leg tension or denouement objective.
 - Opened cycle `2026-02-27T00-24-27-372Z` with one comprehensive task to extend the finale into a timed return-to-spawn epilogue objective (reverse guidance, urgency feedback, and bridge-visible cycle-complete telemetry).
+
+Delta update (2026-02-27T01:10Z):
+- Reviewed latest cycle artifacts (`sim/cycles/2026-02-27T00-24-27-372Z/*`) and current source (`src/main.js`, `scripts/playtest-beacon-pilgrimage.mjs`): post-finale return loop is stable/deterministic across seeded + screenshot runs, with startup stalls at 0 ms and reliable cycle completion telemetry.
+- Remaining top gameplay-quality gap is return-leg tension: current epilogue window is generous and consistently clears with large margin, so urgency reads more like HUD text than moment-to-moment play pressure.
+- Opened cycle `2026-02-27T01-11-15-086Z` with one comprehensive task to add deterministic anomaly pursuit pressure during the return leg (readable world cues + additive pressure telemetry + playtest enforcement) while preserving deterministic completion quality.
+
