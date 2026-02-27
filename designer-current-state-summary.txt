@@ -125,3 +125,8 @@ Delta update (2026-02-26T23:44Z):
 - Reviewed latest cycle artifacts (`sim/cycles/2026-02-26T23-20-34-519Z/*`) and current source: sanctum finale progression is stable and playtester pass confirms deterministic completion with startup_no_progress_window_ms=0.
 - New top gameplay-quality gap is pacing/readability during objective handoffs: latest seeded logs still show occasional long lock-to-attune dead-time on early objectives and repeated post-attune collision chatter before retargeting, which makes flow feel less intentional than it should.
 - Opened cycle `2026-02-26T23-44-19-565Z` with one comprehensive task to ship stage-aware waypoint guidance + handoff smoothing + bridge-visible pacing telemetry + multi-seed controller updates for consistent pilgrimage flow.
+
+Delta update (2026-02-27T00:24Z):
+- Reviewed latest cycle artifacts (`sim/cycles/2026-02-26T23-44-19-565Z/*`) plus current source (`src/main.js`, `scripts/playtest-beacon-pilgrimage.mjs`): pacing/route handoff regressions are fixed and seeded validations now pass with lockToAttuneMs within threshold and startup_no_progress_window_ms=0.
+- New top gameplay-quality gap has shifted to end-of-run payoff and replayable loop depth: the experience still hard-stops immediately after sanctum attunement, so players/agents get no return-leg tension or denouement objective.
+- Opened cycle `2026-02-27T00-24-27-372Z` with one comprehensive task to extend the finale into a timed return-to-spawn epilogue objective (reverse guidance, urgency feedback, and bridge-visible cycle-complete telemetry).

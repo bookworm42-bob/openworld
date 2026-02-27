@@ -1,0 +1,34 @@
+{
+  "cycleId": "2026-02-27T00-24-27-372Z",
+  "vision": "The pilgrimage becomes a complete adventure loop instead of ending abruptly at sanctum attunement: after the finale, the world enters an unstable epilogue and the player must race back to a return shrine at spawn, with clear reverse-route guidance, urgent feedback, and deterministic bridge-visible completion telemetry.",
+  "objectives": [
+    "Add a post-finale return objective (sanctum -> spawn shrine) so progression continues after finale_completed and culminates in a true cycle-complete moment.",
+    "Introduce timed epilogue pressure with readable urgency cues (HUD + world feedback) that make the return leg feel intentional without introducing random failure noise.",
+    "Extend objective/bridge payloads with additive epilogue fields (remaining time, return objective state, cycle completion state) while preserving existing keys for compatibility.",
+    "Upgrade pilgrimage playtest behavior to finish the new return leg and fail loudly on return-timeout or missing cycle-complete events.",
+    "Validate deterministic completion across multi-seed runs (including screenshot-enabled mode) with startup stall metric still at zero and cycle-complete observed in logs/events."
+  ],
+  "implementationHints": [
+    "Treat this as one cohesive pacing/story-progression pass: finale should trigger epilogue immediately, not a disconnected side system.",
+    "Keep new objective snapshot fields additive so existing OBS consumers remain backward compatible.",
+    "Reuse existing route-guidance infrastructure by adding a reverse leg for sanctum-to-spawn instead of building a parallel guidance stack."
+  ],
+  "implementationDetails": [
+    "In src/main.js, extend quest state machine with explicit epilogue-return stages (e.g., return_active / return_failed / cycle_completed) and keep finale_completed as a milestone event rather than terminal end-of-run.",
+    "Author a new return shrine objective at/near spawn (perceivable + interactable + collider + visual identity) and wire it into objective sequencing so sanctum attunement transitions to return objective_started.",
+    "Add deterministic return timer runtime (e.g., configurable budget seconds) that starts at epilogue begin; surface remaining time in HUD text and objective snapshot; emit warning events at meaningful thresholds (for example <=10s).",
+    "If timer expires before return attunement, emit explicit return_failed telemetry + player-facing feedback and reset/soft-fail state deterministically (no hangs). If return attunes in time, emit return_completed + pilgrimage_cycle_completed telemetry.",
+    "Extend route guidance to support active reverse leg from sanctum_core to return shrine (distinct color treatment from outbound guidance) and ensure routeHint* fields continue updating throughout epilogue.",
+    "Update objective snapshot payload with additive fields such as epilogueActive, returnObjectiveId, returnTimeBudgetSec, returnTimeRemainingSec, returnFailed, and cycleCompleted; preserve existing guidance/approach fields.",
+    "Update scripts/playtest-beacon-pilgrimage.mjs to continue beyond finale into the return objective, assert cycle-complete success, and fail on return timeout or missing return_completed/pilgrimage_cycle_completed events within RUN_SEC.",
+    "Add/record return-leg pacing metrics in logs (for example returnSplitSec and totalCycleSec) plus existing lockToAttune/startup metrics; keep lock_to_attune threshold protections in place for every attunement objective including return shrine if lock-gated.",
+    "Validation before handoff: npm run build; run seeded pilgrimage+return suite (ROAM_SEED=404, 505, 606) using AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs; run one screenshot-enabled seed on isolated DEV_PORT/BRIDGE_PORT and verify non-blank before/after captures.",
+    "Record evidence in sim/cycles/<cycleId>/exec_result.json and playtest_handoff.txt: exact commands, return timer behavior, return/cycle completion events, pacing metrics, and screenshot paths showing epilogue readability."
+  ],
+  "taskId": "task-2026-02-27T00-24-27-372Z-1",
+  "playtest": {
+    "type": "agent",
+    "durationSec": 180,
+    "capture": true
+  }
+}

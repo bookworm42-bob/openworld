@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-27T00:19:07Z",
+  "updatedAt": "2026-02-27T00:24:27.372Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -66,6 +66,16 @@
       "owner": "playtester",
       "notes": "Playtest pass: handoff screenshot run (seed 404) reached finale_completed/quest_completed with lockToAttuneMs beacon_1=495, beacon_2=586, beacon_3=498, sanctum_core=479 (all <=2500) and startup_no_progress_window_ms=0; supplemental 45s baseline smoke confirmed stable roam/target ACT loop.",
       "updatedAt": "2026-02-27T00:19:07Z"
+    },
+    {
+      "taskId": "task-2026-02-27T00-24-27-372Z-1",
+      "cycleId": "2026-02-27T00-24-27-372Z",
+      "title": "Post-finale return pilgrimage loop (timed extraction to spawn shrine)",
+      "status": "proposed",
+      "createdAt": "2026-02-27T00:24:27.372Z",
+      "deadlineAt": "2026-02-27T15:24:27.372Z",
+      "owner": "designer",
+      "notes": "Proposed cohesive progression pass: extend sanctum finale into timed return-to-spawn epilogue with reverse route guidance, urgency feedback, and cycle-complete telemetry/playtest assertions."
     }
   ]
 }
