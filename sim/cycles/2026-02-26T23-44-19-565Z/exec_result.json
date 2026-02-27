@@ -2,7 +2,7 @@
   "taskId": "task-2026-02-26T23-44-19-565Z-1",
   "cycleId": "2026-02-26T23-44-19-565Z",
   "status": "implemented",
-  "summary": "Implemented a full pilgrimage pacing/readability pass: deterministic active-leg waypoint breadcrumbs in-world, objective handoff smoothing with temporary completed-objective collider release + telemetry, additive route-hint/split timing fields in objective snapshots, and upgraded pilgrimage playtest behavior/assertions for lock-to-attune pacing and route-hint fallback.",
+  "summary": "Implemented lock-to-attune pacing rework for the pilgrimage loop: tuned attune gating in world runtime and removed pre-attune interaction spam in playtest controller so cooldown does not delay valid attunements. Revalidated deterministic completion across required seeds and screenshot mode with lockToAttuneMs <= 2500 for every objective.",
   "changedFiles": [
     "src/main.js",
     "scripts/playtest-beacon-pilgrimage.mjs",
@@ -17,51 +17,50 @@
   },
   "selfTests": [
     {
-      "command": "DEV_PORT=5186 BRIDGE_PORT=8806 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "command": "DEV_PORT=5193 BRIDGE_PORT=8813 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
       "result": "pass",
       "evidence": [
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404.log:25 [METRIC] objective_split objective=beacon_1 splitSec=6.825 lockToAttuneMs=1058 questElapsedSec=6.825",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404.log:75 [MISSION] objective_handoff_started from=beacon_3 to=sanctum_core settleMs=1250",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404.log:99 [METRIC] startup_no_progress_window_ms=0",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404.log:102 [SUCCESS] finale completion observed; finishing run"
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-rerun-fix4.log:25 [METRIC] objective_split objective=beacon_1 splitSec=6.676 lockToAttuneMs=612 questElapsedSec=6.676",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-rerun-fix4.log:95 [METRIC] objective_split objective=sanctum_core splitSec=11.647 lockToAttuneMs=570 questElapsedSec=42.215",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-rerun-fix4.log:99 [METRIC] startup_no_progress_window_ms=0",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-rerun-fix4.log:102 [SUCCESS] finale completion observed; finishing run"
       ]
     },
     {
-      "command": "DEV_PORT=5187 BRIDGE_PORT=8807 ROAM_SEED=505 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "command": "DEV_PORT=5194 BRIDGE_PORT=8814 ROAM_SEED=505 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
       "result": "pass",
       "evidence": [
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-505.log:55 [METRIC] objective_split objective=beacon_2 splitSec=10.627 lockToAttuneMs=2261 questElapsedSec=17.857",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-505.log:78 [METRIC] objective_split objective=beacon_3 splitSec=17.033 lockToAttuneMs=2416 questElapsedSec=34.89",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-505.log:104 [METRIC] startup_no_progress_window_ms=0",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-505.log:107 [SUCCESS] finale completion observed; finishing run"
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-505-rerun-fix2.log:25 [METRIC] objective_split objective=beacon_1 splitSec=6.47 lockToAttuneMs=647 questElapsedSec=6.47",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-505-rerun-fix2.log:94 [METRIC] objective_split objective=sanctum_core splitSec=11.494 lockToAttuneMs=486 questElapsedSec=42.125",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-505-rerun-fix2.log:98 [METRIC] startup_no_progress_window_ms=0",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-505-rerun-fix2.log:101 [SUCCESS] finale completion observed; finishing run"
       ]
     },
     {
-      "command": "DEV_PORT=5188 BRIDGE_PORT=8808 ROAM_SEED=606 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "command": "DEV_PORT=5192 BRIDGE_PORT=8812 ROAM_SEED=606 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
       "result": "pass",
       "evidence": [
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-606.log:52 [METRIC] objective_split objective=beacon_2 splitSec=9.413 lockToAttuneMs=1044 questElapsedSec=16.283",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-606.log:75 [METRIC] objective_split objective=beacon_3 splitSec=15.658 lockToAttuneMs=1128 questElapsedSec=31.941",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-606.log:100 [METRIC] startup_no_progress_window_ms=0",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-606.log:103 [SUCCESS] finale completion observed; finishing run"
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-606-rerun-fix2.log:25 [METRIC] objective_split objective=beacon_1 splitSec=6.514 lockToAttuneMs=612 questElapsedSec=6.514",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-606-rerun-fix2.log:93 [METRIC] objective_split objective=sanctum_core splitSec=11.561 lockToAttuneMs=484 questElapsedSec=42.256",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-606-rerun-fix2.log:97 [METRIC] startup_no_progress_window_ms=0",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-606-rerun-fix2.log:100 [SUCCESS] finale completion observed; finishing run"
       ]
     },
     {
-      "command": "DEV_PORT=5189 BRIDGE_PORT=8809 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T23-44-19-565Z-task-2026-02-26T23-44-19-565Z-1 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "command": "DEV_PORT=5195 BRIDGE_PORT=8815 ROAM_SEED=404 RUN_SEC=180 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-26T23-44-19-565Z-task-2026-02-26T23-44-19-565Z-1-fix AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
       "result": "pass",
       "evidence": [
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-shots.log:13 [SNAPSHOT] saved artifacts/try-2026-02-26T23-44-19-565Z-task-2026-02-26T23-44-19-565Z-1/00-before-agent.png",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-shots.log:101 [METRIC] objective_split objective=sanctum_core splitSec=12.063 lockToAttuneMs=919 questElapsedSec=51.566",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-shots.log:108 [SUCCESS] finale completion observed; finishing run",
-        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-shots.log:110 [SNAPSHOT] saved artifacts/try-2026-02-26T23-44-19-565Z-task-2026-02-26T23-44-19-565Z-1/99-after-agent.png"
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-shots-rerun-fix.log:13 [SNAPSHOT] saved artifacts/try-2026-02-26T23-44-19-565Z-task-2026-02-26T23-44-19-565Z-1-fix/00-before-agent.png",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-shots-rerun-fix.log:99 [METRIC] objective_split objective=sanctum_core splitSec=11.622 lockToAttuneMs=476 questElapsedSec=47.185",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-shots-rerun-fix.log:106 [SUCCESS] finale completion observed; finishing run",
+        "artifacts/executor/2026-02-26T23-44-19-565Z/playtest-seed-404-shots-rerun-fix.log:108 [SNAPSHOT] saved artifacts/try-2026-02-26T23-44-19-565Z-task-2026-02-26T23-44-19-565Z-1-fix/99-after-agent.png"
       ]
     }
   ],
   "notes": [
-    "Added deterministic route breadcrumb layer for active objective leg only (spawn->beacon_1, beacon_1->beacon_2, beacon_2->beacon_3, beacon_3->sanctum_core), including endpoint beam emphasis for destination readability in screenshots.",
-    "Implemented objective handoff pacing runtime with objective_handoff_started/objective_handoff_settled events, temporary completed-objective collider release, and egress turn assist to avoid ping-pong immediately after attunement.",
-    "Extended objective snapshot payload additively with routeHintId/Index/Dist/Bearing plus objectiveSplitSec and questElapsedSec (both top-level and guidance) while preserving existing fields.",
-    "Emitted objective_split telemetry containing per-objective split and lockToAttuneMs metrics used for pacing assertions and analysis.",
-    "Updated playtest behavior to prefer guidance near objectives, use route hints only as fallback for long-distance steering, and enforce lock-to-attune ceiling (<=2500ms) across completed objectives."
+    "src/main.js: attune gates tuned (attuneRadius 2.5, attuneBearingRad 0.32) and lock-window tracking tightened near attune thresholds to prevent inflated lock-to-attune dwell while preserving lock telemetry.",
+    "scripts/playtest-beacon-pilgrimage.mjs: removed pre-attune interact fallback in both perceived-target and guidance-only branches; interact now fires only when canAttune is true, eliminating cooldown collisions that previously delayed valid attunement.",
+    "Regression fixed against playtester rework report: beacon_1 lock_to_attune no longer exceeds 2500ms in screenshot and non-screenshot seeded runs.",
+    "All required validation runs completed with startup_no_progress_window_ms=0 and finale_completed -> quest_completed success path intact."
   ]
 }

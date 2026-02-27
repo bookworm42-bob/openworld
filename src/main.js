@@ -522,8 +522,8 @@ const OBJECTIVE_APPROACH = {
   nearRadius: 4.6,
   lockRadius: 2.55,
   lockBearingRad: 0.32,
-  attuneRadius: 2.45,
-  attuneBearingRad: 0.22,
+  attuneRadius: 2.5,
+  attuneBearingRad: 0.32,
   lockStableMsRequired: 320,
   slowDownStartRadius: 5.5
 };
@@ -2097,8 +2097,10 @@ function updateObjectiveSnapshotRuntime(nowMs = performance.now()) {
   if (dist <= OBJECTIVE_APPROACH.lockRadius) nextPhase = 'lock';
   else if (dist <= OBJECTIVE_APPROACH.nearRadius) nextPhase = 'approach';
 
-  const facingGood = Math.abs(bearing) <= OBJECTIVE_APPROACH.lockBearingRad;
-  const inLockWindow = nextPhase === 'lock' && facingGood;
+  const lockBearingThreshold = Math.min(OBJECTIVE_APPROACH.lockBearingRad, OBJECTIVE_APPROACH.attuneBearingRad + 0.04);
+  const lockDistThreshold = Math.min(OBJECTIVE_APPROACH.lockRadius, OBJECTIVE_APPROACH.attuneRadius + 0.08);
+  const facingGood = Math.abs(bearing) <= lockBearingThreshold;
+  const inLockWindow = nextPhase === 'lock' && dist <= lockDistThreshold && facingGood;
 
   if (objectiveApproachRuntime.lastObjectiveId !== pilgrimageQuest.activeObjectiveId) {
     objectiveApproachRuntime.lockStableMs = 0;

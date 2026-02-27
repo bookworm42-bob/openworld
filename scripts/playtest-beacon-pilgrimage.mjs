@@ -301,8 +301,7 @@ function buildAct(obs) {
     }
 
     const readyToInteract = canAttune
-      ? nowMs - lastInteractAt > LOCK_INTERACT_COOLDOWN_MS
-      : dist <= TARGET_ARRIVAL_DIST && Math.abs(bearing) < 0.24 && nowMs - lastInteractAt > 1800;
+      && nowMs - lastInteractAt > LOCK_INTERACT_COOLDOWN_MS;
 
     const stalled = nowMs - lastTargetProgressAt > TARGET_STALL_MS;
     const timedOut = nowMs - targetLockStartedAt > RECOVERY_TIMEOUT_MS * 2;
@@ -359,10 +358,8 @@ function buildAct(obs) {
     else if (hintDist > 2.2) forward = 0.24;
 
     const canAttuneHint = Boolean(obs?.objective?.canAttune || guidance?.canAttune);
-    const hintInteractReady = Boolean(guidance?.inInteractionRange) || hintDist <= TARGET_ARRIVAL_DIST;
     const interact = canAttuneHint
-      ? nowMs - lastInteractAt > LOCK_INTERACT_COOLDOWN_MS
-      : (hintInteractReady && absBearing < 0.24 && nowMs - lastInteractAt > 1800);
+      && nowMs - lastInteractAt > LOCK_INTERACT_COOLDOWN_MS;
     if (interact) lastInteractAt = nowMs;
 
     return {
