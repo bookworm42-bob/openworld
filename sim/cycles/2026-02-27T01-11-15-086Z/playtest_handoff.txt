@@ -1,0 +1,59 @@
+Task: task-2026-02-27T01-11-15-086Z-1
+Cycle: 2026-02-27T01-11-15-086Z
+
+Implemented
+- Added deterministic return-leg anomaly pressure in src/main.js:
+  - new visible anomaly actor that pursues along sanctum->return route.
+  - pressure bands (safe/warning/critical/contact) with live HUD integration.
+  - additive objective snapshot fields: pressureActive, pressureLevel, pressureDist, pressureContacts, pressurePenaltySecTotal, pressureWarningsTriggered.
+  - new pressure events: return_pressure_warning, return_pressure_critical, return_pressure_contact.
+  - fair contact penalties with cooldown: timer penalty (1.3s per contact) + temporary move slow.
+- Updated scripts/playtest-beacon-pilgrimage.mjs:
+  - consumes pressure telemetry, increases urgency behavior under critical/contact pressure.
+  - fails when pressure telemetry is missing, return_failed appears, warning count is below threshold, or pressure contacts exceed threshold.
+  - logs pressure metrics (min distance, warning/critical/contact counts, penalty totals).
+
+Primary command to run
+VITE_AGENT_BRIDGE_MODE=observer RUN_SEC=210 ROAM_SEED=404 PRESSURE_MAX_CONTACTS=3 PRESSURE_REQUIRE_WARNINGS=1 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh
+
+Required env/flags
+- VITE_AGENT_BRIDGE_MODE=observer (prevents startup controller ownership stalls)
+- AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs
+- RUN_SEC=210
+- PRESSURE_MAX_CONTACTS=3
+- PRESSURE_REQUIRE_WARNINGS=1
+- Optional screenshot proof run:
+  VITE_AGENT_BRIDGE_MODE=observer DEV_PORT=5175 BRIDGE_PORT=8791 RUN_SEC=210 ROAM_SEED=404 PRESSURE_MAX_CONTACTS=3 PRESSURE_REQUIRE_WARNINGS=1 CAPTURE_ENABLED=1 CAPTURE_EVERY_SEC=20 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh
+
+Expected success signals
+- Pressure event stream observed in log:
+  - [PRESSURE] warning ...
+  - [PRESSURE] critical ... (at least once across seeded runs)
+  - [PRESSURE] contact ... penaltySec=1.3 totalPenaltySec=...
+- Final completion events:
+  - [MISSION] return_completed ...
+  - [MISSION] pilgrimage_cycle_completed ...
+  - [SUCCESS] pilgrimage cycle completion observed; finishing run
+- Metric lines include:
+  - pressure_warning_count>=1
+  - pressure_contact_count<=3
+  - startup_no_progress_window_ms=0
+
+What to verify visually
+- During return stage, visible pink/magenta anomaly appears behind player and advances.
+- Epilogue HUD shows pressure label + anomaly distance and turns critical under high pressure.
+- Contact moments should visibly coincide with “contact” pressure and urgency spike, but run remains completable.
+- Screenshot run assets to inspect:
+  - artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability/00-before-agent.png
+  - .../01-t020s.jpg
+  - .../02-t040s.jpg
+  - .../03-t060s.jpg
+  - .../99-after-agent.png
+
+Known caveats/failure modes
+- If VITE_AGENT_BRIDGE_MODE is not observer, startup may intermittently stall due controller ownership race.
+- pressurePenaltySecTotal in final objective snapshot can read 0 after completion reset; rely on return_pressure_contact event lines for applied penalty totals.
+
+Suggested extra tests
+- Re-run ROAM_SEED=505 and 606 (same command, seed swap) and compare pressure_contact_count distribution.
+- Temporarily set PRESSURE_MAX_CONTACTS=2 in playtester env to confirm strict regression failure behavior.

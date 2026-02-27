@@ -518,6 +518,19 @@ const RETURN_OBJECTIVE = {
 
 const EPILOGUE_RETURN_TIMER_SEC = THREE.MathUtils.clamp(Number(urlParams.get('returnTimerSec') || 75), 25, 240);
 const EPILOGUE_WARNING_THRESHOLDS_SEC = [30, 20, 10, 5];
+const RETURN_PRESSURE_SPAWN_DELAY_SEC = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureDelaySec') || 1.2), 0, 8);
+const RETURN_PRESSURE_WARNING_DIST = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureWarnDist') || 13), 5, 28);
+const RETURN_PRESSURE_CRITICAL_DIST = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureCriticalDist') || 7.2), 2.2, 18);
+const RETURN_PRESSURE_CONTACT_DIST = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureContactDist') || 3.25), 1.4, 8);
+const RETURN_PRESSURE_CONTACT_COOLDOWN_SEC = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureContactCooldownSec') || 1.8), 0.4, 6);
+const RETURN_PRESSURE_PENALTY_SEC = THREE.MathUtils.clamp(Number(urlParams.get('returnPressurePenaltySec') || 1.3), 0.2, 5);
+const RETURN_PRESSURE_SLOW_SEC = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureSlowSec') || 1.15), 0.2, 4);
+const RETURN_PRESSURE_SLOW_MULT = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureSlowMult') || 0.64), 0.3, 0.95);
+const RETURN_PRESSURE_BASE_SPEED = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureBaseSpeed') || 1.22), 0.3, 3.2);
+const RETURN_PRESSURE_CATCHUP_GAIN = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureCatchupGain') || 0.065), 0.01, 0.24);
+const RETURN_PRESSURE_MAX_SPEED = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureMaxSpeed') || 3.55), 0.8, 7);
+const RETURN_PRESSURE_DESIRED_GAP = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureGap') || 12.5), 3.5, 26);
+const RETURN_PRESSURE_MAX_CONTACTS_DEFAULT = THREE.MathUtils.clamp(Number(urlParams.get('returnPressureMaxContacts') || 3), 1, 8);
 
 const QUEST_STAGES = {
   BEACONS_ACTIVE: 'beacons_active',
@@ -641,6 +654,29 @@ const epilogueRuntime = {
   completed: false
 };
 
+const returnPressureRuntime = {
+  actor: null,
+  active: false,
+  armedAtSec: null,
+  spawnDelaySec: RETURN_PRESSURE_SPAWN_DELAY_SEC,
+  routeStart: new THREE.Vector2(SANCTUM_OBJECTIVE.position.x, SANCTUM_OBJECTIVE.position.y),
+  routeEnd: new THREE.Vector2(RETURN_OBJECTIVE.position.x, RETURN_OBJECTIVE.position.y),
+  routeDir: new THREE.Vector2(),
+  routeLength: 0,
+  progressDist: 0,
+  speed: 0,
+  currentDist: null,
+  minDist: null,
+  pressureLevel: 'safe',
+  warningsTriggered: new Set(),
+  warningsCount: 0,
+  contacts: 0,
+  penaltySecTotal: 0,
+  contactCooldownUntilSec: 0,
+  movementSlowUntilSec: 0,
+  maxContacts: RETURN_PRESSURE_MAX_CONTACTS_DEFAULT
+};
+
 const modeHud = {
   el: null
 };
@@ -680,6 +716,22 @@ function clampAxis(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
   return THREE.MathUtils.clamp(n, -1, 1);
+}
+
+function classifyReturnPressure(dist) {
+  if (!Number.isFinite(dist)) return 'safe';
+  if (dist <= RETURN_PRESSURE_CONTACT_DIST) return 'contact';
+  if (dist <= RETURN_PRESSURE_CRITICAL_DIST) return 'critical';
+  if (dist <= RETURN_PRESSURE_WARNING_DIST) return 'warning';
+  return 'safe';
+}
+
+function getPlayerReturnLegProgressDist() {
+  if (!player || returnPressureRuntime.routeLength <= 0) return 0;
+  const player2d = new THREE.Vector2(player.position.x, player.position.z);
+  const local = player2d.sub(returnPressureRuntime.routeStart);
+  const projected = local.dot(returnPressureRuntime.routeDir);
+  return THREE.MathUtils.clamp(projected, 0, returnPressureRuntime.routeLength);
 }
 
 function enqueueBridgeEvent(type, extra = {}) {
@@ -1988,6 +2040,67 @@ function createReturnShrine({ id, label, position }) {
   };
 }
 
+function createReturnPressureActor() {
+  if (returnPressureRuntime.actor?.group) {
+    scene.remove(returnPressureRuntime.actor.group);
+  }
+
+  const group = new THREE.Group();
+  group.name = 'return-pressure-anomaly';
+
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(1.55, 26, 22),
+    new THREE.MeshBasicMaterial({
+      color: 0xff6ea4,
+      transparent: true,
+      opacity: 0.18,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  group.add(shell);
+
+  const core = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.64, 1),
+    new THREE.MeshStandardMaterial({
+      color: 0xff9fd0,
+      emissive: 0xbd2b64,
+      emissiveIntensity: 1.15,
+      roughness: 0.2,
+      metalness: 0.08,
+      transparent: true,
+      opacity: 0.96
+    })
+  );
+  core.castShadow = false;
+  group.add(core);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.95, 0.12, 14, 42),
+    new THREE.MeshBasicMaterial({
+      color: 0xff87ba,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
+
+  const glow = new THREE.PointLight(0xff7ab2, 1.1, 18, 2);
+  glow.position.y = 0.4;
+  group.add(glow);
+
+  group.visible = false;
+  group.userData.agentPerceivable = true;
+  group.userData.agentTag = 'anomaly';
+  group.userData.agentId = 'return_anomaly';
+  scene.add(group);
+
+  returnPressureRuntime.actor = { group, shell, core, ring, glow };
+}
+
 function getObjectiveEntityById(objectiveId) {
   if (!objectiveId) return null;
   if (pilgrimageQuest.sanctum?.id === objectiveId) return pilgrimageQuest.sanctum;
@@ -2389,6 +2502,7 @@ function getObjectiveSnapshot() {
   const guidance = updateObjectiveSnapshotRuntime();
   const returnTimeRemainingSec = getReturnTimeRemainingSec();
   const epilogueActive = pilgrimageQuest.questStage === QUEST_STAGES.RETURN_ACTIVE && epilogueRuntime.active;
+  const pressureDist = Number.isFinite(returnPressureRuntime.currentDist) ? Number(returnPressureRuntime.currentDist.toFixed(3)) : null;
 
   return {
     questId: pilgrimageQuest.questId,
@@ -2403,6 +2517,12 @@ function getObjectiveSnapshot() {
     returnFailed: pilgrimageQuest.returnFailed,
     cycleCompleted: pilgrimageQuest.cycleCompleted,
     epilogueActive,
+    pressureActive: epilogueActive && returnPressureRuntime.active,
+    pressureLevel: returnPressureRuntime.pressureLevel,
+    pressureDist,
+    pressureContacts: returnPressureRuntime.contacts,
+    pressurePenaltySecTotal: Number(returnPressureRuntime.penaltySecTotal.toFixed(3)),
+    pressureWarningsTriggered: returnPressureRuntime.warningsCount,
     returnTimeBudgetSec: epilogueRuntime.budgetSec,
     returnTimeRemainingSec: Number.isFinite(returnTimeRemainingSec) ? Number(returnTimeRemainingSec.toFixed(3)) : null,
     completedObjectiveIds: [...pilgrimageQuest.completedObjectiveIds],
@@ -2654,6 +2774,10 @@ function syncBeaconQuestPhase() {
     else setReturnShrineVisualState('dormant');
   }
 
+  if (returnPressureRuntime.actor?.group && pilgrimageQuest.questStage !== QUEST_STAGES.RETURN_ACTIVE) {
+    returnPressureRuntime.actor.group.visible = false;
+  }
+
   worldStageGrade.target = getQuestStageGrade(pilgrimageQuest.questStage);
   updateObjectiveHud();
 }
@@ -2669,6 +2793,159 @@ function resetEpilogueRuntime() {
   epilogueRuntime.completed = false;
 }
 
+function resetReturnPressureRuntime() {
+  const route = returnPressureRuntime.routeEnd.clone().sub(returnPressureRuntime.routeStart);
+  returnPressureRuntime.routeLength = route.length();
+  if (returnPressureRuntime.routeLength > 0.0001) {
+    returnPressureRuntime.routeDir.copy(route).divideScalar(returnPressureRuntime.routeLength);
+  } else {
+    returnPressureRuntime.routeDir.set(1, 0);
+  }
+
+  returnPressureRuntime.active = false;
+  returnPressureRuntime.armedAtSec = null;
+  returnPressureRuntime.progressDist = 0;
+  returnPressureRuntime.speed = 0;
+  returnPressureRuntime.currentDist = null;
+  returnPressureRuntime.minDist = null;
+  returnPressureRuntime.pressureLevel = 'safe';
+  returnPressureRuntime.warningsTriggered.clear();
+  returnPressureRuntime.warningsCount = 0;
+  returnPressureRuntime.contacts = 0;
+  returnPressureRuntime.penaltySecTotal = 0;
+  returnPressureRuntime.contactCooldownUntilSec = 0;
+  returnPressureRuntime.movementSlowUntilSec = 0;
+
+  const actor = returnPressureRuntime.actor;
+  if (actor?.group) {
+    const startY = getTerrainHeightAt(returnPressureRuntime.routeStart.x, returnPressureRuntime.routeStart.y) + 0.95;
+    actor.group.position.set(returnPressureRuntime.routeStart.x, startY, returnPressureRuntime.routeStart.y);
+    actor.group.visible = false;
+  }
+}
+
+function beginReturnPressure() {
+  resetReturnPressureRuntime();
+  returnPressureRuntime.active = true;
+  returnPressureRuntime.armedAtSec = Number((clock.elapsedTime + returnPressureRuntime.spawnDelaySec).toFixed(3));
+}
+
+function applyReturnPressureContact(distToPlayer, nowSec) {
+  returnPressureRuntime.contacts += 1;
+  returnPressureRuntime.penaltySecTotal = Number((returnPressureRuntime.penaltySecTotal + RETURN_PRESSURE_PENALTY_SEC).toFixed(3));
+  returnPressureRuntime.contactCooldownUntilSec = nowSec + RETURN_PRESSURE_CONTACT_COOLDOWN_SEC;
+  returnPressureRuntime.movementSlowUntilSec = nowSec + RETURN_PRESSURE_SLOW_SEC;
+
+  if (Number.isFinite(epilogueRuntime.deadlineAtSec)) {
+    epilogueRuntime.deadlineAtSec = Number((epilogueRuntime.deadlineAtSec - RETURN_PRESSURE_PENALTY_SEC).toFixed(3));
+  }
+
+  rememberQuestEvent('return_pressure_contact', {
+    objectiveId: pilgrimageQuest.returnObjectiveId,
+    hazardDist: Number(distToPlayer.toFixed(3)),
+    pressureLevel: 'contact',
+    pressureContacts: returnPressureRuntime.contacts,
+    pressurePenaltySec: RETURN_PRESSURE_PENALTY_SEC,
+    pressurePenaltySecTotal: returnPressureRuntime.penaltySecTotal,
+    movementSlowMult: RETURN_PRESSURE_SLOW_MULT,
+    movementSlowSec: RETURN_PRESSURE_SLOW_SEC,
+    returnTimeRemainingSec: getReturnTimeRemainingSec(),
+    questElapsedSec: getQuestElapsedSec()
+  });
+
+  showQuestStatus('Anomaly contact! Extraction destabilized. Push forward.');
+}
+
+function updateReturnPressure(delta) {
+  const actor = returnPressureRuntime.actor;
+  const isReturnStage = pilgrimageQuest.questStage === QUEST_STAGES.RETURN_ACTIVE && epilogueRuntime.active;
+  if (!returnPressureRuntime.active || !isReturnStage || !player) {
+    if (actor?.group) actor.group.visible = false;
+    returnPressureRuntime.currentDist = null;
+    returnPressureRuntime.pressureLevel = 'safe';
+    return;
+  }
+
+  const nowSec = clock.elapsedTime;
+  const armed = Number.isFinite(returnPressureRuntime.armedAtSec) ? nowSec >= returnPressureRuntime.armedAtSec : true;
+  if (!armed) {
+    if (actor?.group) actor.group.visible = false;
+    returnPressureRuntime.currentDist = null;
+    returnPressureRuntime.pressureLevel = 'safe';
+    return;
+  }
+
+  const playerProgress = getPlayerReturnLegProgressDist();
+  const desiredProgress = Math.max(0, playerProgress - RETURN_PRESSURE_DESIRED_GAP);
+  const gap = desiredProgress - returnPressureRuntime.progressDist;
+  const catchupBoost = gap > 0 ? gap * RETURN_PRESSURE_CATCHUP_GAIN : 0;
+  returnPressureRuntime.speed = THREE.MathUtils.clamp(RETURN_PRESSURE_BASE_SPEED + catchupBoost, RETURN_PRESSURE_BASE_SPEED, RETURN_PRESSURE_MAX_SPEED);
+  returnPressureRuntime.progressDist = THREE.MathUtils.clamp(
+    returnPressureRuntime.progressDist + returnPressureRuntime.speed * Math.max(0, delta),
+    0,
+    Math.max(0, returnPressureRuntime.routeLength - 0.45)
+  );
+
+  const anomaly2d = returnPressureRuntime.routeStart.clone().addScaledVector(returnPressureRuntime.routeDir, returnPressureRuntime.progressDist);
+  const y = getTerrainHeightAt(anomaly2d.x, anomaly2d.y) + 0.92;
+  if (actor?.group) {
+    actor.group.visible = true;
+    actor.group.position.set(anomaly2d.x, y, anomaly2d.y);
+  }
+
+  const distToPlayer = Math.max(0, player.position.distanceTo(actor?.group?.position || new THREE.Vector3(anomaly2d.x, y, anomaly2d.y)));
+  returnPressureRuntime.currentDist = Number(distToPlayer.toFixed(3));
+  if (!Number.isFinite(returnPressureRuntime.minDist) || distToPlayer < returnPressureRuntime.minDist) {
+    returnPressureRuntime.minDist = Number(distToPlayer.toFixed(3));
+  }
+
+  const pressureLevel = classifyReturnPressure(distToPlayer);
+  const prevLevel = returnPressureRuntime.pressureLevel;
+  returnPressureRuntime.pressureLevel = pressureLevel;
+
+  if (pressureLevel !== prevLevel && (pressureLevel === 'warning' || pressureLevel === 'critical')) {
+    const eventType = pressureLevel === 'critical' ? 'return_pressure_critical' : 'return_pressure_warning';
+    const key = `${eventType}:${Math.floor(distToPlayer)}`;
+    if (!returnPressureRuntime.warningsTriggered.has(key)) {
+      returnPressureRuntime.warningsTriggered.add(key);
+      returnPressureRuntime.warningsCount += 1;
+      rememberQuestEvent(eventType, {
+        objectiveId: pilgrimageQuest.returnObjectiveId,
+        hazardDist: Number(distToPlayer.toFixed(3)),
+        pressureLevel,
+        pressureContacts: returnPressureRuntime.contacts,
+        pressurePenaltySecTotal: returnPressureRuntime.penaltySecTotal,
+        returnTimeRemainingSec: getReturnTimeRemainingSec(),
+        questElapsedSec: getQuestElapsedSec()
+      });
+      if (pressureLevel === 'critical') {
+        showQuestStatus('Critical anomaly pressure! Sprint to the return shrine.');
+      }
+    }
+  }
+
+  if (pressureLevel === 'contact' && nowSec >= returnPressureRuntime.contactCooldownUntilSec) {
+    applyReturnPressureContact(distToPlayer, nowSec);
+  }
+
+  if (actor?.group) {
+    const pulse = Math.sin(nowSec * 5.8);
+    const intensity = pressureLevel === 'critical' || pressureLevel === 'contact' ? 1 : pressureLevel === 'warning' ? 0.72 : 0.46;
+    actor.shell.material.opacity = 0.14 + intensity * 0.16 + Math.max(0, pulse) * 0.08;
+    actor.ring.material.opacity = 0.1 + intensity * 0.2;
+    actor.core.material.emissiveIntensity = 0.86 + intensity * 1.05;
+    actor.glow.intensity = 0.65 + intensity * 1.2;
+    actor.group.scale.setScalar(0.92 + intensity * 0.18 + Math.max(0, pulse) * 0.09);
+    actor.group.rotation.y += (0.35 + intensity * 0.4) * delta;
+    actor.ring.rotation.z += (0.55 + intensity * 0.6) * delta;
+  }
+}
+
+function getReturnPressureMoveMultiplier() {
+  if (!returnPressureRuntime.active || pilgrimageQuest.questStage !== QUEST_STAGES.RETURN_ACTIVE) return 1;
+  return clock.elapsedTime <= returnPressureRuntime.movementSlowUntilSec ? RETURN_PRESSURE_SLOW_MULT : 1;
+}
+
 function beginReturnEpilogue() {
   epilogueRuntime.active = true;
   epilogueRuntime.failed = false;
@@ -2676,6 +2953,7 @@ function beginReturnEpilogue() {
   epilogueRuntime.warnedThresholds.clear();
   epilogueRuntime.startedAtSec = Number(clock.elapsedTime.toFixed(3));
   epilogueRuntime.deadlineAtSec = Number((epilogueRuntime.startedAtSec + epilogueRuntime.budgetSec).toFixed(3));
+  beginReturnPressure();
 }
 
 function getReturnTimeRemainingSec() {
@@ -2688,6 +2966,7 @@ function handleReturnTimeout() {
 
   epilogueRuntime.failed = true;
   epilogueRuntime.active = false;
+  returnPressureRuntime.active = false;
   pilgrimageQuest.returnActive = false;
   pilgrimageQuest.returnFailed = true;
   pilgrimageQuest.activeObjectiveId = null;
@@ -2699,10 +2978,13 @@ function handleReturnTimeout() {
     returnTimeBudgetSec: epilogueRuntime.budgetSec,
     returnTimeRemainingSec: 0,
     reason: 'return_timeout',
+    pressureContacts: returnPressureRuntime.contacts,
+    pressurePenaltySecTotal: returnPressureRuntime.penaltySecTotal,
     questStage: QUEST_STAGES.RETURN_FAILED,
     questElapsedSec: getQuestElapsedSec()
   });
 
+  resetReturnPressureRuntime();
   syncBeaconQuestPhase();
   resetObjectiveApproachRuntime();
   showQuestStatus('Return window collapsed. Pilgrimage resetting…');
@@ -2726,6 +3008,8 @@ function updateEpilogueTimer() {
         objectiveId: pilgrimageQuest.returnObjectiveId,
         thresholdSec: threshold,
         returnTimeRemainingSec: Number(remainingSec.toFixed(3)),
+        hazardDist: returnPressureRuntime.currentDist,
+        pressureLevel: returnPressureRuntime.pressureLevel,
         questElapsedSec: getQuestElapsedSec()
       });
       if (threshold <= 10 && performance.now() > epilogueRuntime.warningCooldownMs) {
@@ -2819,6 +3103,7 @@ function startBeaconQuest() {
   objectivePacingRuntime.handoff.toObjectiveId = null;
 
   resetEpilogueRuntime();
+  resetReturnPressureRuntime();
   syncBeaconQuestPhase();
   resetObjectiveApproachRuntime();
   beginObjectiveTiming(pilgrimageQuest.activeObjectiveId);
@@ -2870,6 +3155,7 @@ function createBeaconPilgrimageQuest() {
   pilgrimageQuest.beacons = BEACON_LAYOUT.map(createBeacon);
   pilgrimageQuest.sanctum = createSanctumCore(SANCTUM_OBJECTIVE);
   pilgrimageQuest.returnShrine = createReturnShrine(RETURN_OBJECTIVE);
+  createReturnPressureActor();
   createRouteGuidanceLayer();
   createBeaconQuestUi();
   startBeaconQuest();
@@ -2953,7 +3239,13 @@ function updateObjectiveHud() {
   if (pilgrimageQuest.questStage === QUEST_STAGES.RETURN_ACTIVE) {
     const remainingSec = getReturnTimeRemainingSec();
     const remainingTxt = Number.isFinite(remainingSec) ? `${Math.max(0, Math.ceil(remainingSec))}s` : '--';
-    pilgrimageQuest.objectiveHudEl.textContent = `Objective: Extract to the Return Shrine · ${remainingTxt} remaining${hintSuffix}`;
+    const pressureDist = Number.isFinite(returnPressureRuntime.currentDist) ? `${Math.max(0, Math.round(returnPressureRuntime.currentDist))}m` : '--';
+    const pressureLabel = returnPressureRuntime.pressureLevel === 'critical' || returnPressureRuntime.pressureLevel === 'contact'
+      ? 'critical pressure'
+      : returnPressureRuntime.pressureLevel === 'warning'
+        ? 'pressure rising'
+        : 'anomaly trailing';
+    pilgrimageQuest.objectiveHudEl.textContent = `Objective: Extract to the Return Shrine · ${remainingTxt} remaining · ${pressureLabel} (${pressureDist})${hintSuffix}`;
     pilgrimageQuest.objectiveHudEl.classList.remove('complete');
     return;
   }
@@ -2994,10 +3286,21 @@ function updateEpilogueHud() {
   }
 
   const ratio = budgetSec > 0 ? remainingSec / budgetSec : 0;
-  const critical = remainingSec <= 10 || ratio <= 0.18;
+  const pressureDist = Number.isFinite(returnPressureRuntime.currentDist) ? Math.max(0, Math.round(returnPressureRuntime.currentDist)) : null;
+  const pressureLevel = returnPressureRuntime.pressureLevel;
+  const critical = remainingSec <= 10 || ratio <= 0.18 || pressureLevel === 'critical' || pressureLevel === 'contact';
+  const pressureLabel = pressureLevel === 'contact'
+    ? 'CONTACT'
+    : pressureLevel === 'critical'
+      ? 'CRITICAL'
+      : pressureLevel === 'warning'
+        ? 'WARNING'
+        : 'TRAILING';
+  const pressureTxt = pressureDist == null ? pressureLabel : `${pressureLabel} · anomaly ${pressureDist}m`;
+
   pilgrimageQuest.epilogueHudEl.classList.add('show');
   pilgrimageQuest.epilogueHudEl.classList.toggle('critical', critical);
-  pilgrimageQuest.epilogueHudEl.textContent = `Epilogue unstable · return to shrine in ${Math.max(0, Math.ceil(remainingSec))}s`;
+  pilgrimageQuest.epilogueHudEl.textContent = `Epilogue unstable · ${Math.max(0, Math.ceil(remainingSec))}s · ${pressureTxt}`;
 }
 
 function triggerBeaconPulse(beacon, pulseType = 'attune') {
@@ -3075,6 +3378,9 @@ function completeActiveObjective(objective) {
       fromObjectiveId: objective.id,
       returnTimeBudgetSec: epilogueRuntime.budgetSec,
       returnTimeRemainingSec: epilogueRuntime.budgetSec,
+      pressureActive: true,
+      pressureLevel: returnPressureRuntime.pressureLevel,
+      pressureDist: returnPressureRuntime.currentDist,
       questElapsedSec: getQuestElapsedSec()
     });
 
@@ -3087,6 +3393,9 @@ function completeActiveObjective(objective) {
       progress: pilgrimageQuest.progress,
       returnTimeBudgetSec: epilogueRuntime.budgetSec,
       returnTimeRemainingSec: epilogueRuntime.budgetSec,
+      pressureActive: true,
+      pressureLevel: returnPressureRuntime.pressureLevel,
+      pressureDist: returnPressureRuntime.currentDist,
       questElapsedSec: getQuestElapsedSec()
     });
 
@@ -3105,6 +3414,7 @@ function completeActiveObjective(objective) {
   if (objective.id === pilgrimageQuest.returnObjectiveId) {
     epilogueRuntime.active = false;
     epilogueRuntime.completed = true;
+    returnPressureRuntime.active = false;
     pilgrimageQuest.returnActive = false;
     pilgrimageQuest.returnFailed = false;
     pilgrimageQuest.cycleCompleted = true;
@@ -3115,6 +3425,7 @@ function completeActiveObjective(objective) {
     objectivePacingRuntime.returnSplitSec = Number((clock.elapsedTime - (epilogueRuntime.startedAtSec || clock.elapsedTime)).toFixed(3));
     objectivePacingRuntime.totalCycleSec = getQuestElapsedSec();
 
+    resetReturnPressureRuntime();
     syncBeaconQuestPhase();
     resetObjectiveApproachRuntime();
 
@@ -3127,6 +3438,10 @@ function completeActiveObjective(objective) {
       totalCycleSec: objectivePacingRuntime.totalCycleSec,
       returnTimeBudgetSec: epilogueRuntime.budgetSec,
       returnTimeRemainingSec: getReturnTimeRemainingSec() ?? 0,
+      pressureContacts: returnPressureRuntime.contacts,
+      pressurePenaltySecTotal: returnPressureRuntime.penaltySecTotal,
+      pressureWarningsTriggered: returnPressureRuntime.warningsCount,
+      minPressureDist: returnPressureRuntime.minDist,
       questElapsedSec: getQuestElapsedSec()
     });
     rememberQuestEvent('pilgrimage_cycle_completed', {
@@ -3135,6 +3450,10 @@ function completeActiveObjective(objective) {
       returnSplitSec: objectivePacingRuntime.returnSplitSec,
       totalCycleSec: objectivePacingRuntime.totalCycleSec,
       returnTimeBudgetSec: epilogueRuntime.budgetSec,
+      pressureContacts: returnPressureRuntime.contacts,
+      pressurePenaltySecTotal: returnPressureRuntime.penaltySecTotal,
+      pressureWarningsTriggered: returnPressureRuntime.warningsCount,
+      minPressureDist: returnPressureRuntime.minDist,
       questStage: pilgrimageQuest.questStage,
       questElapsedSec: getQuestElapsedSec()
     });
@@ -3519,6 +3838,8 @@ function updatePlayer(delta) {
   if (!player) return;
 
   const moveSpeed = 4.4;
+  const pressureMoveMult = getReturnPressureMoveMultiplier();
+  const effectiveMoveSpeed = moveSpeed * pressureMoveMult;
   const nowMs = performance.now();
   settleObjectiveHandoffIfReady(nowMs);
   const bridgeAct = agentBridge.getActState(nowMs);
@@ -3596,8 +3917,8 @@ function updatePlayer(delta) {
       objectiveSlow = Math.max(objectiveSlow, 0.82);
     }
 
-    desiredX += playerMoveDirection.x * moveSpeed * forwardInput * objectiveSlow * delta;
-    desiredZ += playerMoveDirection.z * moveSpeed * forwardInput * objectiveSlow * delta;
+    desiredX += playerMoveDirection.x * effectiveMoveSpeed * forwardInput * objectiveSlow * delta;
+    desiredZ += playerMoveDirection.z * effectiveMoveSpeed * forwardInput * objectiveSlow * delta;
 
     if (actions.walk && !jumping) setAction('walk', 0.16);
   } else if (actions.idle && !jumping) {
@@ -3698,6 +4019,7 @@ function updatePlayer(delta) {
   }
 
   updateRouteGuidanceVisuals();
+  updateReturnPressure(delta);
   updateEpilogueTimer();
   updateObjectiveHud();
   updateEpilogueHud();

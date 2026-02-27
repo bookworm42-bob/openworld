@@ -16,6 +16,8 @@ const RECOVERY_ARC_MS = Number(process.env.RECOVERY_ARC_MS || 1300);
 const LOCK_HESITATION_MAX_MS = Number(process.env.LOCK_HESITATION_MAX_MS || 3000);
 const LOCK_TO_ATTUNE_MAX_MS = Number(process.env.LOCK_TO_ATTUNE_MAX_MS || 5000);
 const LOCK_INTERACT_COOLDOWN_MS = Number(process.env.LOCK_INTERACT_COOLDOWN_MS || 1200);
+const PRESSURE_MAX_CONTACTS = Number(process.env.PRESSURE_MAX_CONTACTS || 3);
+const PRESSURE_REQUIRE_WARNINGS = Number(process.env.PRESSURE_REQUIRE_WARNINGS || 1);
 const STARTUP_NO_PROGRESS_MS = Number(process.env.STARTUP_NO_PROGRESS_MS || 6000);
 const STARTUP_DIST_EPS = Number(process.env.STARTUP_DIST_EPS || 0.05);
 const STARTUP_NO_PROGRESS_MIN_DIST = Number(process.env.STARTUP_NO_PROGRESS_MIN_DIST || 3.2);
@@ -71,6 +73,12 @@ let lastBridgeControllerId = null;
 const objectiveLockToAttuneMs = new Map();
 const objectiveSplitSec = new Map();
 let routeHintFallbackCount = 0;
+let pressureFieldsSeen = false;
+let pressureActiveSeen = false;
+let pressureWarningCount = 0;
+let pressureCriticalCount = 0;
+let pressureContactCount = 0;
+let minPressureDist = Number.POSITIVE_INFINITY;
 
 const RNG_SEED = Number(process.env.ROAM_SEED || Date.now());
 let rngState = (RNG_SEED >>> 0) || 1;
@@ -273,6 +281,10 @@ function buildAct(obs) {
     updateTargetProgress(target, nowMs);
     const bearing = safeNum(target.bearing, 0);
     const dist = safeNum(target.dist, 999);
+    const objective = obs?.objective || {};
+    const pressureLevel = objective?.pressureLevel || 'safe';
+    const pressureDist = safeNum(objective?.pressureDist, NaN);
+    const pressureCritical = pressureLevel === 'critical' || pressureLevel === 'contact';
     const routeHint = routeHintFromObjective(obs);
     const avoid = front < 1.5 ? clamp1((left - right) / 1.6) : 0;
     const hintBlend = routeHint && dist > 7.5 && Math.abs(bearing) > 1.1
@@ -282,7 +294,8 @@ function buildAct(obs) {
     const desiredBearing = blendedBearing + avoid * 0.35;
     const absBearing = Math.abs(desiredBearing);
 
-    const desiredTurn = absBearing < 0.03 ? 0 : clamp1(desiredBearing * 1.42);
+    let desiredTurn = absBearing < 0.03 ? 0 : clamp1(desiredBearing * 1.42);
+    if (pressureCritical && absBearing > 0.95) desiredTurn *= 0.72;
     const turn = clamp1(lastTurn * 0.68 + desiredTurn * 0.32);
     lastTurn = turn;
 
@@ -293,7 +306,11 @@ function buildAct(obs) {
     else if (dist > 3.2) forward = 0.72;
     else if (dist > 2.3) forward = 0.36;
 
-    const objective = obs?.objective || {};
+    if (pressureCritical) {
+      if (Number.isFinite(pressureDist) && pressureDist < 5.6) forward = Math.max(forward, 0.96);
+      else forward = Math.max(forward, 0.82);
+    }
+
     const guidance = objective?.guidance || {};
     const canAttune = Boolean(objective?.canAttune || guidance?.canAttune);
     const approachPhase = objective?.approachPhase || guidance?.approachPhase || null;
@@ -332,7 +349,9 @@ function buildAct(obs) {
     }
 
     return {
-      mode: canAttune ? 'objective_lock' : (approachPhase ? `objective_${approachPhase}` : 'objective'),
+      mode: canAttune
+        ? (pressureCritical ? 'pressure_lock' : 'objective_lock')
+        : (pressureCritical ? 'pressure_escape' : (approachPhase ? `objective_${approachPhase}` : 'objective')),
       targetId: target.id,
       targetDist: dist,
       targetBearing: bearing,
@@ -453,9 +472,11 @@ function startActLoop() {
       const progress = Number(objective?.progress || 0).toFixed(2);
       const lockStableMs = Number(objective?.lockStableMs || objective?.guidance?.lockStableMs || 0);
       const targetTxt = base.targetId ? ` target=${base.targetId} dist=${safeNum(base.targetDist, NaN).toFixed(2)}` : '';
+      const pressureLevel = objective?.pressureLevel || 'safe';
+      const pressureDist = Number.isFinite(safeNum(objective?.pressureDist, NaN)) ? safeNum(objective.pressureDist, NaN).toFixed(2) : 'n/a';
       const pos = latestObs?.self?.pos;
       const posTxt = pos ? ` pos=(${safeNum(pos.x, NaN).toFixed(2)},${safeNum(pos.z, NaN).toFixed(2)})` : '';
-      console.log(`[ACT] mode=${base.mode} t=${tSec.toFixed(1)} active=${active} progress=${progress} lockStableMs=${lockStableMs}${targetTxt}${posTxt} interact=${base.interact}`);
+      console.log(`[ACT] mode=${base.mode} t=${tSec.toFixed(1)} active=${active} progress=${progress} lockStableMs=${lockStableMs} pressure=${pressureLevel}:${pressureDist}${targetTxt}${posTxt} interact=${base.interact}`);
     }
 
     if (!runFailedForHesitation && maxInRangeHesitationMs > LOCK_HESITATION_MAX_MS) {
@@ -497,9 +518,33 @@ function startActLoop() {
         return;
       }
 
+      if (!pressureFieldsSeen || !pressureActiveSeen) {
+        console.error(`[FAIL] pressure telemetry missing pressureFieldsSeen=${pressureFieldsSeen} pressureActiveSeen=${pressureActiveSeen}`);
+        stop(8);
+        return;
+      }
+
+      if (pressureWarningCount + pressureCriticalCount < PRESSURE_REQUIRE_WARNINGS) {
+        console.error(`[FAIL] pressure warnings below threshold seen=${pressureWarningCount + pressureCriticalCount} required=${PRESSURE_REQUIRE_WARNINGS}`);
+        stop(9);
+        return;
+      }
+
+      if (pressureContactCount > PRESSURE_MAX_CONTACTS) {
+        console.error(`[FAIL] pressure contact count exceeded count=${pressureContactCount} limit=${PRESSURE_MAX_CONTACTS}`);
+        stop(7);
+        return;
+      }
+
       console.log(`[METRIC] max_in_range_hesitation_ms=${Math.round(maxInRangeHesitationMs)}`);
       console.log(`[METRIC] startup_no_progress_window_ms=${Math.round(startupTrackedForMs)}`);
       console.log(`[METRIC] route_hint_fallback_count=${routeHintFallbackCount}`);
+      console.log(`[METRIC] min_pressure_dist=${Number.isFinite(minPressureDist) ? minPressureDist.toFixed(3) : 'n/a'}`);
+      console.log(`[METRIC] pressure_warning_count=${pressureWarningCount}`);
+      console.log(`[METRIC] pressure_critical_count=${pressureCriticalCount}`);
+      console.log(`[METRIC] pressure_contact_count=${pressureContactCount}`);
+      if (latestObs?.objective?.pressurePenaltySecTotal != null) console.log(`[METRIC] pressure_penalty_sec_total=${latestObs.objective.pressurePenaltySecTotal}`);
+      if (latestObs?.objective?.pressureWarningsTriggered != null) console.log(`[METRIC] pressure_warnings_triggered=${latestObs.objective.pressureWarningsTriggered}`);
       if (lockMetricSummary) console.log(`[METRIC] lock_to_attune_ms_by_objective=${lockMetricSummary}`);
       if (latestObs?.objective?.returnSplitSec != null) console.log(`[METRIC] return_split_sec=${latestObs.objective.returnSplitSec}`);
       if (latestObs?.objective?.totalCycleSec != null) console.log(`[METRIC] total_cycle_sec=${latestObs.objective.totalCycleSec}`);
@@ -565,6 +610,20 @@ ws.addEventListener('message', (event) => {
     }
 
     const objective = msg.objective || {};
+    const hasPressureFields = Object.prototype.hasOwnProperty.call(objective, 'pressureActive')
+      && Object.prototype.hasOwnProperty.call(objective, 'pressureLevel')
+      && Object.prototype.hasOwnProperty.call(objective, 'pressureDist')
+      && Object.prototype.hasOwnProperty.call(objective, 'pressureContacts')
+      && Object.prototype.hasOwnProperty.call(objective, 'pressurePenaltySecTotal')
+      && Object.prototype.hasOwnProperty.call(objective, 'pressureWarningsTriggered');
+    if (hasPressureFields) pressureFieldsSeen = true;
+
+    if (objective?.pressureActive === true) {
+      pressureActiveSeen = true;
+      const pDist = safeNum(objective?.pressureDist, NaN);
+      if (Number.isFinite(pDist)) minPressureDist = Math.min(minPressureDist, pDist);
+    }
+
     if (objective?.finaleCompleted === true || objective?.questStage === 'finale_completed') {
       finaleCompleted = true;
     }
@@ -665,7 +724,24 @@ ws.addEventListener('message', (event) => {
         console.log(`[MISSION] return_started objective=${ev.objectiveId || 'unknown'} budgetSec=${ev.returnTimeBudgetSec ?? 'n/a'}`);
       }
       if (ev.type === 'return_timer_warning') {
-        console.log(`[MISSION] return_timer_warning thresholdSec=${ev.thresholdSec ?? 'n/a'} remainingSec=${ev.returnTimeRemainingSec ?? 'n/a'}`);
+        console.log(`[MISSION] return_timer_warning thresholdSec=${ev.thresholdSec ?? 'n/a'} remainingSec=${ev.returnTimeRemainingSec ?? 'n/a'} hazardDist=${ev.hazardDist ?? 'n/a'} pressure=${ev.pressureLevel || 'n/a'}`);
+      }
+      if (ev.type === 'return_pressure_warning') {
+        pressureWarningCount += 1;
+        console.log(`[PRESSURE] warning hazardDist=${ev.hazardDist ?? 'n/a'} remainingSec=${ev.returnTimeRemainingSec ?? 'n/a'}`);
+      }
+      if (ev.type === 'return_pressure_critical') {
+        pressureCriticalCount += 1;
+        console.log(`[PRESSURE] critical hazardDist=${ev.hazardDist ?? 'n/a'} remainingSec=${ev.returnTimeRemainingSec ?? 'n/a'}`);
+      }
+      if (ev.type === 'return_pressure_contact') {
+        pressureContactCount += 1;
+        console.log(`[PRESSURE] contact hazardDist=${ev.hazardDist ?? 'n/a'} penaltySec=${ev.pressurePenaltySec ?? 'n/a'} totalPenaltySec=${ev.pressurePenaltySecTotal ?? 'n/a'} contacts=${ev.pressureContacts ?? pressureContactCount}`);
+        if (pressureContactCount > PRESSURE_MAX_CONTACTS) {
+          console.error(`[FAIL] pressure_contact_count exceeded count=${pressureContactCount} limit=${PRESSURE_MAX_CONTACTS}`);
+          stop(7);
+          return;
+        }
       }
       if (ev.type === 'return_failed') {
         returnFailed = true;

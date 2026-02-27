@@ -1,0 +1,175 @@
+[SETUP] openworld=/Users/alin/.openclaw/workspace/openworld
+[SETUP] dev_url=http://127.0.0.1:5175 ws_url=ws://127.0.0.1:8791
+[SETUP] agent_script=scripts/playtest-beacon-pilgrimage.mjs
+[SETUP] controller_client mode=controller label=keepalive-controller session=keepalive-20260227T012445Z priority=100
+[SETUP] screenshots enabled -> artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability (bridge_mode=observer)
+[PORT] :5175 already free
+[PORT] :8791 already free
+[START] npm run dev -- --host 0.0.0.0 --port 5175
+[START] dev pid=1971 log=/Users/alin/.openclaw/workspace/openworld/.agent-dev.log
+[READY] dev reachable at http://127.0.0.1:5175
+[START] browser client -> http://127.0.0.1:5175 (headless=true bridge_mode=controller label=keepalive-controller)
+[READY] browser client pid=1997 log=/Users/alin/.openclaw/workspace/openworld/.agent-browser-client.log
+[SNAPSHOT] saved artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability/00-before-agent.png
+[SNAPSHOT] bridge_mode=observer label=snapshot-before-20260227T012445Z
+[RUN] OPENWORLD_WS_URL=ws://127.0.0.1:8791 node scripts/playtest-beacon-pilgrimage.mjs
+[CONNECT] ws://127.0.0.1:8791
+[OPEN] connected
+[ACT] mode=search t=0.1 active=none progress=0.00 lockStableMs=0 pressure=safe:n/a interact=false
+[OBS] first observation received
+[BRIDGE] active_controller id=d8458d2b-f667-4508-8d97-0db5435410d6 label=keepalive-controller mode=controller session=keepalive-20260227T012445Z candidates=1 [keepalive-controller:controller:100]
+[BRIDGE_EVENT] type=bridge_controller_acquired reason=hello_controller active=d8458d2b-f667-4508-8d97-0db5435410d6 label=keepalive-controller
+[ACT] mode=objective_hint t=1.1 active=beacon_1 progress=0.00 lockStableMs=0 pressure=safe:0.00 target=beacon_1 dist=5.45 interact=false
+[ACT] mode=objective_hint t=2.1 active=beacon_1 progress=0.00 lockStableMs=0 pressure=safe:0.00 target=beacon_1 dist=3.14 interact=false
+[LOCK] acquired objective=beacon_1 dist=2.54 bearing=0.02
+[ACT] mode=objective_hint t=3.2 active=beacon_1 progress=0.00 lockStableMs=166 pressure=safe:0.00 target=beacon_1 dist=2.46 interact=false
+[LOCK] attunement_started objective=beacon_1 lockStableMs=564
+[MISSION] objective_completed beacon_1 progress=0.2
+[METRIC] objective_split objective=beacon_1 splitSec=11.58 lockToAttuneMs=564 questElapsedSec=11.58
+[MISSION] objective_handoff_started from=beacon_1 to=beacon_2 settleMs=1250
+[MISSION] objective_started beacon_2 progress=0.2
+[ACT] mode=objective_hint t=4.2 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=23.33 interact=false
+[NAV] collision collider=beacon_1 tag=beacon blockedRatio=0
+[MISSION] objective_handoff_settled from=beacon_1 to=beacon_2 settleMs=1340
+[ACT] mode=objective_hint t=5.2 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=21.25 interact=false
+[NAV] collision collider=rock-12 tag=rock blockedRatio=0.159
+[ACT] mode=objective_hint t=6.3 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=17.79 interact=false
+[NAV] collision collider=rock-12 tag=rock blockedRatio=0.225
+[NAV] collision collider=tree-11 tag=tree blockedRatio=0
+[ACT] mode=objective_hint t=7.3 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=13.85 interact=false
+[ACT] mode=objective_hint t=8.3 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=9.65 interact=false
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.429
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.471
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.369
+[ACT] mode=objective_hint t=9.4 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=8.14 interact=false
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.281
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.235
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.188
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.135
+[ACT] mode=objective_hint t=10.4 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=6.06 interact=false
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.092
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.051
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.027
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.014
+[ACT] mode=objective_approach t=11.4 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=3.93 interact=false
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.006
+[NAV] collision collider=tower-near tag=tower blockedRatio=0.001
+[NAV] collision collider=tower-near tag=tower blockedRatio=0
+[ACT] mode=objective_hint t=12.5 active=beacon_2 progress=0.20 lockStableMs=0 pressure=safe:0.00 target=beacon_2 dist=2.55 interact=false
+[LOCK] acquired objective=beacon_2 dist=2.5 bearing=-0.019
+[LOCK] attunement_started objective=beacon_2 lockStableMs=547
+[MISSION] objective_completed beacon_2 progress=0.4
+[METRIC] objective_split objective=beacon_2 splitSec=9.574 lockToAttuneMs=547 questElapsedSec=21.154
+[MISSION] objective_handoff_started from=beacon_2 to=beacon_3 settleMs=1250
+[MISSION] objective_started beacon_3 progress=0.4
+[ACT] mode=objective_hint t=13.5 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=54.47 interact=false
+[MISSION] objective_handoff_settled from=beacon_2 to=beacon_3 settleMs=1411
+[ACT] mode=objective_hint t=14.6 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=51.99 interact=false
+[ACT] mode=objective_hint t=15.6 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=48.06 interact=false
+[ACT] mode=objective_hint t=16.6 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=43.93 interact=false
+[ACT] mode=objective_hint t=17.7 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=39.37 interact=false
+[ACT] mode=objective_hint t=18.7 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=35.31 interact=false
+[ACT] mode=objective_hint t=19.7 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=31.13 interact=false
+[CAPTURED] artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability/01-t020s.jpg
+[ACT] mode=objective_hint t=20.8 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=27.02 interact=false
+[ACT] mode=objective_hint t=21.8 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=22.87 interact=false
+[ACT] mode=objective_hint t=22.8 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=18.79 interact=false
+[ACT] mode=objective_far t=23.9 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=14.25 interact=false
+[ACT] mode=objective_far t=24.9 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=10.39 interact=false
+[ACT] mode=objective_far t=26.0 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=6.16 interact=false
+[ACT] mode=objective_approach t=27.0 active=beacon_3 progress=0.40 lockStableMs=0 pressure=safe:0.00 target=beacon_3 dist=3.63 interact=false
+[LOCK] acquired objective=beacon_3 dist=2.54 bearing=0.029
+[ACT] mode=objective_hint t=28.0 active=beacon_3 progress=0.40 lockStableMs=261 pressure=safe:0.00 target=beacon_3 dist=2.45 interact=false
+[LOCK] attunement_started objective=beacon_3 lockStableMs=522
+[MISSION] objective_completed beacon_3 progress=0.6
+[METRIC] objective_split objective=beacon_3 splitSec=15.132 lockToAttuneMs=522 questElapsedSec=36.286
+[MISSION] objective_handoff_started from=beacon_3 to=sanctum_core settleMs=1250
+[MISSION] finale_unlocked objective=sanctum_core progress=0.6
+[MISSION] objective_started sanctum_core progress=0.6
+[ACT] mode=objective_hint t=29.1 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=35.99 interact=false
+[MISSION] objective_handoff_settled from=beacon_3 to=sanctum_core settleMs=1324
+[ACT] mode=objective_hint t=30.1 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=32.12 interact=false
+[ACT] mode=objective_hint t=31.1 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=27.73 interact=false
+[ACT] mode=objective_hint t=32.2 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=23.92 interact=false
+[ACT] mode=objective_hint t=33.2 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=19.69 interact=false
+[ACT] mode=objective_hint t=34.3 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=15.45 interact=false
+[ACT] mode=objective_far t=35.3 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=10.96 interact=false
+[ACT] mode=objective_far t=36.3 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=6.85 interact=false
+[ACT] mode=objective_hint t=37.4 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=3.80 interact=false
+[ACT] mode=objective_hint t=38.4 active=sanctum_core progress=0.60 lockStableMs=0 pressure=safe:0.00 target=sanctum_core dist=2.87 interact=false
+[LOCK] acquired objective=sanctum_core dist=2.54 bearing=-0.026
+[ACT] mode=objective_hint t=39.4 active=sanctum_core progress=0.60 lockStableMs=371 pressure=safe:0.00 target=sanctum_core dist=2.39 interact=false
+[MISSION] finale_started objective=sanctum_core dist=2.32 lockStableMs=579
+[LOCK] attunement_started objective=sanctum_core lockStableMs=579
+[MISSION] objective_completed sanctum_core progress=0.8
+[METRIC] objective_split objective=sanctum_core splitSec=11.35 lockToAttuneMs=579 questElapsedSec=47.636
+[MISSION] finale_completed objective=sanctum_core progress=0.6
+[MISSION] return_started objective=return_shrine budgetSec=75
+[MISSION] objective_handoff_started from=sanctum_core to=return_shrine settleMs=1250
+[MISSION] objective_started return_shrine progress=0.6
+[CAPTURED] artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability/02-t040s.jpg
+[ACT] mode=objective_hint t=40.5 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:0.00 target=return_shrine dist=99.11 interact=false
+[PRESSURE] contact hazardDist=2.392 penaltySec=1.3 totalPenaltySec=1.3 contacts=1
+[ACT] mode=objective_hint t=41.5 active=return_shrine progress=0.80 lockStableMs=0 pressure=contact:2.39 target=return_shrine dist=99.00 interact=false
+[MISSION] objective_handoff_settled from=sanctum_core to=return_shrine settleMs=2845
+[ACT] mode=objective_hint t=42.5 active=return_shrine progress=0.80 lockStableMs=0 pressure=contact:2.12 target=return_shrine dist=100.00 interact=false
+[PRESSURE] contact hazardDist=2.189 penaltySec=1.3 totalPenaltySec=2.6 contacts=2
+[ACT] mode=objective_hint t=43.6 active=return_shrine progress=0.80 lockStableMs=0 pressure=contact:2.92 target=return_shrine dist=99.97 interact=false
+[PRESSURE] contact hazardDist=1.935 penaltySec=1.3 totalPenaltySec=3.9 contacts=3
+[ACT] mode=objective_hint t=44.6 active=return_shrine progress=0.80 lockStableMs=0 pressure=contact:1.91 target=return_shrine dist=96.57 interact=false
+[ACT] mode=objective_hint t=45.7 active=return_shrine progress=0.80 lockStableMs=0 pressure=contact:2.26 target=return_shrine dist=93.99 interact=false
+[PRESSURE] critical hazardDist=3.364 remainingSec=64.527
+[ACT] mode=objective_hint t=46.7 active=return_shrine progress=0.80 lockStableMs=0 pressure=critical:4.69 target=return_shrine dist=89.64 interact=false
+[PRESSURE] warning hazardDist=7.225 remainingSec=63.048
+[ACT] mode=objective_hint t=47.7 active=return_shrine progress=0.80 lockStableMs=0 pressure=warning:7.22 target=return_shrine dist=85.81 interact=false
+[ACT] mode=objective_hint t=48.8 active=return_shrine progress=0.80 lockStableMs=0 pressure=warning:10.36 target=return_shrine dist=81.22 interact=false
+[ACT] mode=objective_hint t=49.8 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:13.16 target=return_shrine dist=77.15 interact=false
+[ACT] mode=objective_hint t=50.8 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:15.89 target=return_shrine dist=73.01 interact=false
+[ACT] mode=objective_hint t=51.9 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:18.37 target=return_shrine dist=69.00 interact=false
+[ACT] mode=objective_hint t=52.9 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:20.91 target=return_shrine dist=64.60 interact=false
+[ACT] mode=objective_hint t=53.9 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:23.28 target=return_shrine dist=60.22 interact=false
+[ACT] mode=objective_hint t=55.0 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:25.23 target=return_shrine dist=56.35 interact=false
+[ACT] mode=objective_hint t=56.0 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:27.31 target=return_shrine dist=51.95 interact=false
+[ACT] mode=objective_hint t=57.0 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:29.09 target=return_shrine dist=47.93 interact=false
+[ACT] mode=objective_hint t=58.1 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:30.92 target=return_shrine dist=43.48 interact=false
+[NAV] collision collider=object-solid-016 tag=object blockedRatio=0.529
+[NAV] collision collider=object-solid-016 tag=object blockedRatio=0.403
+[NAV] collision collider=object-solid-016 tag=object blockedRatio=0.052
+[ACT] mode=objective_hint t=59.1 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:31.18 target=return_shrine dist=40.88 interact=false
+[ACT] mode=objective_hint t=60.1 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:32.73 target=return_shrine dist=36.78 interact=false
+[CAPTURED] artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability/03-t060s.jpg
+[ACT] mode=objective_hint t=61.2 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:34.19 target=return_shrine dist=32.65 interact=false
+[ACT] mode=objective_hint t=62.2 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:35.62 target=return_shrine dist=28.33 interact=false
+[ACT] mode=objective_hint t=63.2 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:36.85 target=return_shrine dist=24.37 interact=false
+[ACT] mode=objective_hint t=64.3 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:37.98 target=return_shrine dist=20.45 interact=false
+[ACT] mode=objective_hint t=65.3 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:39.26 target=return_shrine dist=15.75 interact=false
+[ACT] mode=objective_far t=66.4 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:40.40 target=return_shrine dist=11.53 interact=false
+[ACT] mode=objective_far t=67.4 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:41.42 target=return_shrine dist=7.55 interact=false
+[ACT] mode=objective_approach t=68.4 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:41.57 target=return_shrine dist=4.02 interact=false
+[ACT] mode=objective_hint t=69.5 active=return_shrine progress=0.80 lockStableMs=0 pressure=safe:39.82 target=return_shrine dist=2.69 interact=false
+[LOCK] acquired objective=return_shrine dist=2.51 bearing=-0.012
+[LOCK] attunement_started objective=return_shrine lockStableMs=741
+[MISSION] objective_completed return_shrine progress=1
+[METRIC] objective_split objective=return_shrine splitSec=30.82 lockToAttuneMs=741 questElapsedSec=78.456
+[MISSION] return_completed objective=return_shrine returnSplitSec=30.82 totalCycleSec=78.456
+[MISSION] pilgrimage_cycle_completed objective=return_shrine totalCycleSec=78.456
+[MISSION] quest_completed progress=1 totalCycleSec=78.456
+[METRIC] max_in_range_hesitation_ms=0
+[METRIC] startup_no_progress_window_ms=0
+[METRIC] route_hint_fallback_count=0
+[METRIC] min_pressure_dist=0.000
+[METRIC] pressure_warning_count=1
+[METRIC] pressure_critical_count=1
+[METRIC] pressure_contact_count=3
+[METRIC] pressure_penalty_sec_total=0
+[METRIC] pressure_warnings_triggered=0
+[METRIC] lock_to_attune_ms_by_objective=beacon_1:564ms, beacon_2:547ms, beacon_3:522ms, sanctum_core:579ms, return_shrine:741ms
+[METRIC] return_split_sec=30.82
+[METRIC] total_cycle_sec=78.456
+[SUCCESS] pilgrimage cycle completion observed; finishing run
+[CLOSE] code=1006 reason=(none)
+[SNAPSHOT] saved artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability/99-after-agent.png
+[SNAPSHOT] bridge_mode=observer label=snapshot-after-20260227T012445Z
+[DONE] screenshots in artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability
+[CLEANUP] stopping browser client pid=1997
+[CLEANUP] stopping dev server pid=1971

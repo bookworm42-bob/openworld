@@ -1,0 +1,80 @@
+{
+  "cycleId": "2026-02-27T01-11-15-086Z",
+  "taskId": "task-2026-02-27T01-11-15-086Z-1",
+  "status": "implemented",
+  "summary": "Implemented deterministic epilogue anomaly pressure for the return leg: added a visible chasing hazard actor, pressure-tier HUD messaging, additive objective snapshot fields, pressure warning/contact telemetry events with fair cooldown penalties, and playtest controller pressure-awareness + strict pressure regression checks.",
+  "changedFiles": [
+    "src/main.js",
+    "scripts/playtest-beacon-pilgrimage.mjs"
+  ],
+  "verification": {
+    "buildCommand": "npm run build",
+    "selfTestCommand": "VITE_AGENT_BRIDGE_MODE=observer RUN_SEC=210 ROAM_SEED=404 PRESSURE_MAX_CONTACTS=3 PRESSURE_REQUIRE_WARNINGS=1 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+    "additionalCommands": [
+      "VITE_AGENT_BRIDGE_MODE=observer RUN_SEC=210 ROAM_SEED=505 PRESSURE_MAX_CONTACTS=3 PRESSURE_REQUIRE_WARNINGS=1 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "VITE_AGENT_BRIDGE_MODE=observer RUN_SEC=210 ROAM_SEED=606 PRESSURE_MAX_CONTACTS=3 PRESSURE_REQUIRE_WARNINGS=1 CAPTURE_ENABLED=0 TAKE_SCREENSHOTS=0 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "VITE_AGENT_BRIDGE_MODE=observer DEV_PORT=5175 BRIDGE_PORT=8791 RUN_SEC=210 ROAM_SEED=404 PRESSURE_MAX_CONTACTS=3 PRESSURE_REQUIRE_WARNINGS=1 CAPTURE_ENABLED=1 CAPTURE_EVERY_SEC=20 TAKE_SCREENSHOTS=1 SHOTS_DIR=artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh"
+    ],
+    "logFiles": [
+      "sim/cycles/2026-02-27T01-11-15-086Z/artifacts/playtest-seed-404.log",
+      "sim/cycles/2026-02-27T01-11-15-086Z/artifacts/playtest-seed-505.log",
+      "sim/cycles/2026-02-27T01-11-15-086Z/artifacts/playtest-seed-606.log",
+      "sim/cycles/2026-02-27T01-11-15-086Z/artifacts/playtest-seed-404-screenshots.log"
+    ],
+    "evidence": {
+      "seed404": {
+        "returnSplitSec": 30.887,
+        "totalCycleSec": 74.694,
+        "startupNoProgressWindowMs": 0,
+        "pressureWarningCount": 1,
+        "pressureCriticalCount": 1,
+        "pressureContactCount": 3,
+        "pressurePenaltyEvents": [
+          "contact penaltySec=1.3 totalPenaltySec=1.3",
+          "contact penaltySec=1.3 totalPenaltySec=2.6",
+          "contact penaltySec=1.3 totalPenaltySec=3.9"
+        ],
+        "cycleCompleted": true
+      },
+      "seed505": {
+        "returnSplitSec": 30.465,
+        "totalCycleSec": 73.258,
+        "startupNoProgressWindowMs": 0,
+        "pressureWarningCount": 1,
+        "pressureCriticalCount": 2,
+        "pressureContactCount": 1,
+        "pressurePenaltyEvents": [
+          "contact penaltySec=1.3 totalPenaltySec=1.3"
+        ],
+        "cycleCompleted": true
+      },
+      "seed606": {
+        "returnSplitSec": 30.604,
+        "totalCycleSec": 74.045,
+        "startupNoProgressWindowMs": 0,
+        "pressureWarningCount": 1,
+        "pressureCriticalCount": 1,
+        "pressureContactCount": 3,
+        "pressurePenaltyEvents": [
+          "contact penaltySec=1.3 totalPenaltySec=1.3",
+          "contact penaltySec=1.3 totalPenaltySec=2.6",
+          "contact penaltySec=1.3 totalPenaltySec=3.9"
+        ],
+        "cycleCompleted": true
+      },
+      "screenshotRun": {
+        "returnSplitSec": 30.82,
+        "totalCycleSec": 78.456,
+        "startupNoProgressWindowMs": 0,
+        "pressureWarningCount": 1,
+        "pressureCriticalCount": 1,
+        "pressureContactCount": 3,
+        "shotsDir": "artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability",
+        "beforeScreenshot": "artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability/00-before-agent.png",
+        "afterScreenshot": "artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability/99-after-agent.png",
+        "beforeBytes": 371431,
+        "afterBytes": 370945
+      }
+    }
+  }
+}
