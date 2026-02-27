@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-26T23:58:59Z",
+  "updatedAt": "2026-02-27T00:02:29.785Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -60,12 +60,12 @@
       "taskId": "task-2026-02-26T23-44-19-565Z-1",
       "cycleId": "2026-02-26T23-44-19-565Z",
       "title": "Pilgrimage pacing and waypoint guidance pass (faster objective handoffs + clearer route readability)",
-      "status": "implemented",
+      "status": "back_in_implementation",
       "createdAt": "2026-02-26T23:44:19.565Z",
       "deadlineAt": "2026-02-27T14:44:19.565Z",
       "owner": "executor",
-      "notes": "Implemented route-leg breadcrumb guidance, handoff smoothing/collision release, additive route/split objective telemetry, and upgraded playtest pacing assertions (seeds 404/505/606 + screenshot run passed).",
-      "updatedAt": "2026-02-26T23:58:59Z"
+      "notes": "Playtest rework required: handoff primary run and seed-505 rerun both failed lock_to_attune assertion at beacon_1 (6127ms / 3480ms > 2500ms), preventing full pilgrimage/finale validation.",
+      "updatedAt": "2026-02-27T00:02:29.785Z"
     }
   ]
 }
