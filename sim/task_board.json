@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-27T01:26:40Z",
+  "updatedAt": "2026-02-27T01:33:59Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -82,12 +82,12 @@
       "taskId": "task-2026-02-27T01-11-15-086Z-1",
       "cycleId": "2026-02-27T01-11-15-086Z",
       "title": "Epilogue anomaly pressure pass (chasing hazard + readable urgency)",
-      "status": "implemented",
+      "status": "tested",
       "createdAt": "2026-02-27T01:11:15.086Z",
       "deadlineAt": "2026-02-27T16:11:15.086Z",
-      "owner": "executor",
-      "notes": "Implemented deterministic anomaly pursuit pressure with warning/critical/contact telemetry and validated seeded/screenshot runs; ready for playtester verification.",
-      "updatedAt": "2026-02-27T01:26:40Z"
+      "owner": "playtester",
+      "notes": "Playtest pass: handoff primary pressure run completed return_completed + pilgrimage_cycle_completed with warning/critical/contact telemetry and startup_no_progress_window_ms=0; reviewed readability screenshot artifacts.",
+      "updatedAt": "2026-02-27T01:33:59Z"
     }
   ]
 }

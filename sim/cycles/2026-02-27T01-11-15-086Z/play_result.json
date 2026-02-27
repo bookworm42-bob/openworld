@@ -1,0 +1,35 @@
+{
+  "cycleId": "2026-02-27T01-11-15-086Z",
+  "taskId": "task-2026-02-27T01-11-15-086Z-1",
+  "status": "pass",
+  "summary": "Primary handoff run passed: epilogue anomaly pressure telemetry fired (warning/critical/contact), return leg completed, and full pilgrimage cycle finished deterministically with no startup stall.",
+  "runConfig": {
+    "script": "scripts/playtest-beacon-pilgrimage.mjs",
+    "runSec": 210,
+    "captureEverySec": 0
+  },
+  "observations": [
+    "Executed handoff primary command first with observer bridge mode and pressure thresholds.",
+    "Connectivity/control loop healthy in primary run: [OPEN] connected, [OBS] first observation received, stable [ACT] stream through full cycle.",
+    "Pressure mechanic validated in logs: return_pressure_contact (2), return_pressure_critical (1), return_pressure_warning (1).",
+    "Success path validated: return_completed + pilgrimage_cycle_completed + quest_completed observed.",
+    "Cycle metrics from primary run: return_split_sec=29.126, total_cycle_sec=72.141, startup_no_progress_window_ms=0, pressure_contact_count=2 (<=3), pressure_warning_count=1 (>=1).",
+    "Visual artifacts reviewed from current-cycle readability run: artifacts/try-2026-02-27T01-11-15-086Z-task-2026-02-27T01-11-15-086Z-1-pressure-readability (5 non-blank captures including before/after).",
+    "Supplemental baseline smoke (default exploration script) confirmed stable roam ACT stream and no stalls."
+  ],
+  "metrics": {
+    "runSec": 210,
+    "captureEverySec": 0,
+    "screenshotCount": 5,
+    "obsReceived": true,
+    "actLoopHealthy": true
+  },
+  "issues": [
+    "Policy mismatch to track: handoff primary command uses RUN_SEC=210, which is above playtester default adaptive range (30-180)."
+  ],
+  "nextRecommendations": [
+    "Clamp future handoff primary playtester commands to RUN_SEC<=180 unless policy is explicitly revised.",
+    "Keep observer bridge mode in pressure regression runs to avoid startup ownership races.",
+    "If baseline roam/target telemetry remains a required gate, add deterministic target-presence setup so mode=target can be consistently exercised in smoke runs."
+  ]
+}
