@@ -1,0 +1,39 @@
+Task: task-2026-02-27T00-24-27-372Z-1
+Cycle: 2026-02-27T00-24-27-372Z
+
+Implemented
+- Post-finale return loop now continues from sanctum_core into return_shrine (spawn-side extraction shrine).
+- Timed epilogue runtime is active during return leg; objective snapshot carries additive fields:
+  epilogueActive, returnObjectiveId, returnTimeBudgetSec, returnTimeRemainingSec, returnFailed, cycleCompleted.
+- Telemetry/events now include return_started, return_timer_warning, return_failed (timeout path), return_completed, and pilgrimage_cycle_completed.
+- Playtest agent script enforces return-loop completion and fails fast on return_failed / missing cycle completion.
+
+Primary test command (run this first)
+ROAM_SEED=404 RUN_SEC=210 TAKE_SCREENSHOTS=1 DEV_PORT=4273 BRIDGE_PORT=9987 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs SHOTS_DIR=sim/cycles/2026-02-27T00-24-27-372Z/screenshots/playtester-seed-404 ./scripts/run-agent-exploration.sh
+
+Required env/flags and script
+- AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs
+- For isolation, use dedicated ports (recommended: DEV_PORT=4273 BRIDGE_PORT=9987)
+- Keep RUN_SEC high enough for full loop (>=180; 210 used in executor validation)
+
+Expected success signals
+- [MISSION] return_started ... budgetSec=75
+- [MISSION] return_completed objective=return_shrine ...
+- [MISSION] pilgrimage_cycle_completed objective=return_shrine ...
+- [SUCCESS] pilgrimage cycle completion observed; finishing run
+- [METRIC] startup_no_progress_window_ms=0
+- No [FAIL] return_failed and no RUN_SEC timeout failure
+
+What to verify visually
+- Return shrine is visible/perceivable at spawn area and can be attuned.
+- After sanctum finale, HUD/objective guidance clearly flips to return objective with urgency cues.
+- Before/after screenshots are non-blank and show meaningful state progression.
+
+Known caveats / failure modes
+- If another local tab is already running on default ports, controller ownership can interfere; isolated ports avoid this.
+- return_failed is expected only when timer expires before shrine attunement (should fail loudly, not hang).
+
+Suggested extra tests
+- Seed sweep without screenshots:
+  - ROAM_SEED=404|505|606 RUN_SEC=210 TAKE_SCREENSHOTS=0 DEV_PORT=4173 BRIDGE_PORT=9887 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh
+- Check lock-to-attune metrics remain healthy across all attunement objectives including return_shrine.

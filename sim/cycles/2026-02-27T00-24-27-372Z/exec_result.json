@@ -1,0 +1,54 @@
+{
+  "cycleId": "2026-02-27T00-24-27-372Z",
+  "taskId": "task-2026-02-27T00-24-27-372Z-1",
+  "status": "implemented",
+  "summary": "Post-finale return pilgrimage loop is fully wired and now validated across required deterministic runs. Return objective starts after sanctum finale, timed epilogue fields/events flow through objective snapshots, and completion emits return_completed + pilgrimage_cycle_completed telemetry.",
+  "changedFiles": [
+    "src/main.js",
+    "scripts/playtest-beacon-pilgrimage.mjs"
+  ],
+  "verification": {
+    "buildCommand": "npm run build",
+    "selfTestCommand": "ROAM_SEED=404 RUN_SEC=210 TAKE_SCREENSHOTS=0 DEV_PORT=4173 BRIDGE_PORT=9887 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+    "additionalCommands": [
+      "ROAM_SEED=505 RUN_SEC=210 TAKE_SCREENSHOTS=0 DEV_PORT=4173 BRIDGE_PORT=9887 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "ROAM_SEED=606 RUN_SEC=210 TAKE_SCREENSHOTS=0 DEV_PORT=4173 BRIDGE_PORT=9887 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs ./scripts/run-agent-exploration.sh",
+      "RUN_SEC=210 ROAM_SEED=404 TAKE_SCREENSHOTS=1 DEV_PORT=4273 BRIDGE_PORT=9987 AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs SHOTS_DIR=sim/cycles/2026-02-27T00-24-27-372Z/screenshots/seed-404 ./scripts/run-agent-exploration.sh"
+    ],
+    "logFiles": [
+      "sim/cycles/2026-02-27T00-24-27-372Z/logs/executor-seed-404.log",
+      "sim/cycles/2026-02-27T00-24-27-372Z/logs/executor-seed-505.log",
+      "sim/cycles/2026-02-27T00-24-27-372Z/logs/executor-seed-606.log",
+      "sim/cycles/2026-02-27T00-24-27-372Z/logs/executor-seed-404-screenshot.log"
+    ],
+    "evidence": {
+      "seed404": {
+        "returnSplitSec": 27.114,
+        "totalCycleSec": 71.69,
+        "startupNoProgressWindowMs": 0,
+        "cycleCompleted": true
+      },
+      "seed505": {
+        "returnSplitSec": 27.162,
+        "totalCycleSec": 70.885,
+        "startupNoProgressWindowMs": 0,
+        "cycleCompleted": true
+      },
+      "seed606": {
+        "returnSplitSec": 27.148,
+        "totalCycleSec": 70.845,
+        "startupNoProgressWindowMs": 0,
+        "cycleCompleted": true
+      },
+      "screenshotRun": {
+        "returnSplitSec": 27.088,
+        "totalCycleSec": 75.181,
+        "startupNoProgressWindowMs": 0,
+        "beforeScreenshot": "sim/cycles/2026-02-27T00-24-27-372Z/screenshots/seed-404/00-before-agent.png",
+        "afterScreenshot": "sim/cycles/2026-02-27T00-24-27-372Z/screenshots/seed-404/99-after-agent.png",
+        "beforeBytes": 370754,
+        "afterBytes": 370829
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-27T00:44:52Z",
+  "updatedAt": "2026-02-27T01:00:27.451Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -71,12 +71,12 @@
       "taskId": "task-2026-02-27T00-24-27-372Z-1",
       "cycleId": "2026-02-27T00-24-27-372Z",
       "title": "Post-finale return pilgrimage loop (timed extraction to spawn shrine)",
-      "status": "in_progress",
+      "status": "implemented",
       "createdAt": "2026-02-27T00:24:27.372Z",
       "deadlineAt": "2026-02-27T15:24:27.372Z",
       "owner": "executor",
-      "notes": "Implemented return-loop epilogue quest flow + playtester controller-handshake updates; partial self-test completed (seed 404 cycle pass). Remaining: full multi-seed + screenshot validation artifacts before handoff.",
-      "updatedAt": "2026-02-27T00:44:52Z"
+      "notes": "Return-loop validation complete: build + seeded 404/505/606 + isolated screenshot run all reached return_completed and pilgrimage_cycle_completed with startup_no_progress_window_ms=0.",
+      "updatedAt": "2026-02-27T01:00:27.451Z"
     }
   ]
 }
