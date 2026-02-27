@@ -1,0 +1,31 @@
+{
+  "cycleId": "2026-02-27T00-24-27-372Z",
+  "taskId": "task-2026-02-27T00-24-27-372Z-1",
+  "status": "pass",
+  "summary": "Pass: primary handoff run completed the full post-finale return pilgrimage loop with return_completed + pilgrimage_cycle_completed telemetry and healthy control/visual checks; supplemental baseline smoke confirmed roam/target ACT behavior.",
+  "runConfig": {
+    "script": "scripts/run-agent-exploration.sh (AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs)",
+    "runSec": 210,
+    "captureEverySec": 18
+  },
+  "observations": [
+    "Primary required handoff command (ROAM_SEED=404, screenshots enabled, isolated ports) connected successfully and received first observation.",
+    "Mission progression reached return_started -> return_completed -> pilgrimage_cycle_completed -> quest_completed; no return_failed observed.",
+    "Key metrics from run: startup_no_progress_window_ms=0, route_hint_fallback_count=0, return_split_sec=27.162, total_cycle_sec=74.069.",
+    "Lock-to-attune timing remained healthy across all attunement objectives including return_shrine (641ms).",
+    "Screenshots were non-blank and showed meaningful progression (before/after PNGs ~370KB each plus in-run JPG captures).",
+    "Supplemental 45s baseline run with scripts/agent-exploration-first-steps.mjs showed stable ACT stream with both mode=roam and mode=target."
+  ],
+  "metrics": {
+    "runSec": 210,
+    "captureEverySec": 18,
+    "screenshotCount": 5,
+    "obsReceived": true,
+    "actLoopHealthy": true
+  },
+  "issues": [],
+  "nextRecommendations": [
+    "Keep isolated DEV_PORT/BRIDGE_PORT for screenshot-enabled validation to avoid controller ownership interference.",
+    "Retain one quick baseline roam/target smoke run in future playtests alongside pilgrimage-specific script runs."
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-27T01:00:27.451Z",
+  "updatedAt": "2026-02-27T01:05:30Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -71,12 +71,12 @@
       "taskId": "task-2026-02-27T00-24-27-372Z-1",
       "cycleId": "2026-02-27T00-24-27-372Z",
       "title": "Post-finale return pilgrimage loop (timed extraction to spawn shrine)",
-      "status": "implemented",
+      "status": "tested",
       "createdAt": "2026-02-27T00:24:27.372Z",
       "deadlineAt": "2026-02-27T15:24:27.372Z",
-      "owner": "executor",
-      "notes": "Return-loop validation complete: build + seeded 404/505/606 + isolated screenshot run all reached return_completed and pilgrimage_cycle_completed with startup_no_progress_window_ms=0.",
-      "updatedAt": "2026-02-27T01:00:27.451Z"
+      "owner": "playtester",
+      "notes": "Playtest pass: handoff primary run (seed 404, screenshots enabled) reached return_completed + pilgrimage_cycle_completed with startup_no_progress_window_ms=0; supplemental 45s baseline smoke confirmed stable roam/target ACT loop.",
+      "updatedAt": "2026-02-27T01:05:30Z"
     }
   ]
 }
