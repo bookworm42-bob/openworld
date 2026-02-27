@@ -147,7 +147,8 @@ canvas {
 }
 
 #objective-lock-hud,
-#objective-next-cue {
+#objective-next-cue,
+#objective-epilogue-hud {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
@@ -192,3 +193,25 @@ canvas {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+
+#objective-epilogue-hud {
+  top: 104px;
+  color: #f2e9ff;
+  background: rgba(38, 20, 62, 0.78);
+  border: 1px solid rgba(210, 176, 255, 0.56);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+#objective-epilogue-hud.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+#objective-epilogue-hud.critical {
+  color: #ffe6ee;
+  border-color: rgba(255, 143, 173, 0.75);
+  background: rgba(74, 19, 38, 0.82);
+}
+

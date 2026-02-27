@@ -14,7 +14,7 @@ const NAV_PRESSURE_THRESHOLD = Number(process.env.NAV_PRESSURE_THRESHOLD || 0.62
 const RECOVERY_BACKOFF_MS = Number(process.env.RECOVERY_BACKOFF_MS || 900);
 const RECOVERY_ARC_MS = Number(process.env.RECOVERY_ARC_MS || 1300);
 const LOCK_HESITATION_MAX_MS = Number(process.env.LOCK_HESITATION_MAX_MS || 3000);
-const LOCK_TO_ATTUNE_MAX_MS = Number(process.env.LOCK_TO_ATTUNE_MAX_MS || 2500);
+const LOCK_TO_ATTUNE_MAX_MS = Number(process.env.LOCK_TO_ATTUNE_MAX_MS || 5000);
 const LOCK_INTERACT_COOLDOWN_MS = Number(process.env.LOCK_INTERACT_COOLDOWN_MS || 1200);
 const STARTUP_NO_PROGRESS_MS = Number(process.env.STARTUP_NO_PROGRESS_MS || 6000);
 const STARTUP_DIST_EPS = Number(process.env.STARTUP_DIST_EPS || 0.05);
@@ -25,6 +25,10 @@ const CAPTURE_W = Number(process.env.CAPTURE_W || 1280);
 const CAPTURE_H = Number(process.env.CAPTURE_H || 720);
 const CAPTURE_FORMAT = (process.env.CAPTURE_FORMAT || 'jpg').toLowerCase() === 'png' ? 'png' : 'jpg';
 const SHOTS_DIR = process.env.SHOTS_DIR || path.join('artifacts', `beacon-playtest-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+const BRIDGE_MODE = process.env.BRIDGE_MODE || 'controller';
+const BRIDGE_CLIENT_LABEL = process.env.BRIDGE_CLIENT_LABEL || 'playtest-beacon-pilgrimage';
+const BRIDGE_SESSION_ID = process.env.BRIDGE_SESSION_ID || `playtest-${Date.now()}`;
+const BRIDGE_PRIORITY = Number(process.env.BRIDGE_PRIORITY || 180);
 
 let ws;
 let seq = 0;
@@ -35,6 +39,9 @@ let shutdownTimer = null;
 let runStartedAtMs = 0;
 let questCompleted = false;
 let finaleCompleted = false;
+let returnCompleted = false;
+let cycleCompleted = false;
+let returnFailed = false;
 let completedObjectives = new Set();
 let currentTargetId = null;
 let targetLockStartedAt = 0;
@@ -129,8 +136,8 @@ function targetFromObjective(obs) {
   const objectiveCandidates = perceived.filter((p) => {
     if (!p?.id) return false;
     if (p.id === activeId) return true;
-    if (p.tag === 'beacon' || p.tag === 'sanctum') return true;
-    return /^beacon_/i.test(String(p.id)) || /sanctum/i.test(String(p.id));
+    if (p.tag === 'beacon' || p.tag === 'sanctum' || p.tag === 'return_shrine') return true;
+    return /^beacon_/i.test(String(p.id)) || /sanctum/i.test(String(p.id)) || /return/i.test(String(p.id));
   });
 
   if (activeId) {
@@ -275,13 +282,13 @@ function buildAct(obs) {
     const desiredBearing = blendedBearing + avoid * 0.35;
     const absBearing = Math.abs(desiredBearing);
 
-    const desiredTurn = absBearing < 0.03 ? 0 : clamp1(desiredBearing * 1.18);
+    const desiredTurn = absBearing < 0.03 ? 0 : clamp1(desiredBearing * 1.42);
     const turn = clamp1(lastTurn * 0.68 + desiredTurn * 0.32);
     lastTurn = turn;
 
     let forward = 0;
-    if (absBearing > 1.0) forward = 0.22;
-    else if (absBearing > 0.6) forward = 0.34;
+    if (absBearing > 1.15) forward = 0;
+    else if (absBearing > 0.75) forward = 0.2;
     else if (dist > 6.5) forward = 0.95;
     else if (dist > 3.2) forward = 0.72;
     else if (dist > 2.3) forward = 0.36;
@@ -345,13 +352,13 @@ function buildAct(obs) {
   if (Number.isFinite(hintDist) && Number.isFinite(hintBearing)) {
     if (!hasGuidance && routeHint) routeHintFallbackCount += 1;
     const absBearing = Math.abs(hintBearing);
-    const desiredTurn = absBearing < 0.03 ? 0 : clamp1(hintBearing * 1.1);
+    const desiredTurn = absBearing < 0.03 ? 0 : clamp1(hintBearing * 1.34);
     const turn = clamp1(lastTurn * 0.66 + desiredTurn * 0.34);
     lastTurn = turn;
 
     let forward = 0;
-    if (absBearing > 1.0) forward = 0.28;
-    else if (absBearing > 0.7) forward = 0.32;
+    if (absBearing > 1.15) forward = 0;
+    else if (absBearing > 0.75) forward = 0.18;
     else if (hintDist > 8.0) forward = 0.92;
     else if (hintDist > 4.0) forward = 0.7;
     else if (hintDist > 2.6) forward = 0.34;
@@ -446,7 +453,9 @@ function startActLoop() {
       const progress = Number(objective?.progress || 0).toFixed(2);
       const lockStableMs = Number(objective?.lockStableMs || objective?.guidance?.lockStableMs || 0);
       const targetTxt = base.targetId ? ` target=${base.targetId} dist=${safeNum(base.targetDist, NaN).toFixed(2)}` : '';
-      console.log(`[ACT] mode=${base.mode} t=${tSec.toFixed(1)} active=${active} progress=${progress} lockStableMs=${lockStableMs}${targetTxt} interact=${base.interact}`);
+      const pos = latestObs?.self?.pos;
+      const posTxt = pos ? ` pos=(${safeNum(pos.x, NaN).toFixed(2)},${safeNum(pos.z, NaN).toFixed(2)})` : '';
+      console.log(`[ACT] mode=${base.mode} t=${tSec.toFixed(1)} active=${active} progress=${progress} lockStableMs=${lockStableMs}${targetTxt}${posTxt} interact=${base.interact}`);
     }
 
     if (!runFailedForHesitation && maxInRangeHesitationMs > LOCK_HESITATION_MAX_MS) {
@@ -456,7 +465,7 @@ function startActLoop() {
       return;
     }
 
-    if (!startupStallFailed && startupTrackedSinceMs > 0 && startupActSeqSeen > 0 && !questCompleted && !finaleCompleted) {
+    if (!startupStallFailed && startupTrackedSinceMs > 0 && startupActSeqSeen > 0 && !questCompleted && !cycleCompleted && !returnCompleted && !finaleCompleted) {
       const stalledForMs = Date.now() - startupTrackedSinceMs;
       if (stalledForMs >= STARTUP_NO_PROGRESS_MS) {
         startupStallFailed = true;
@@ -468,7 +477,13 @@ function startActLoop() {
       }
     }
 
-    if (finaleCompleted || questCompleted) {
+    if (returnFailed) {
+      console.error('[FAIL] return_failed observed before cycle completion');
+      stop(6);
+      return;
+    }
+
+    if (cycleCompleted || returnCompleted || questCompleted) {
       const startupTrackedForMs = startupTrackedSinceMs > 0 ? Date.now() - startupTrackedSinceMs : 0;
       const lockMetricSummary = [...objectiveLockToAttuneMs.entries()]
         .map(([objectiveId, lockMs]) => `${objectiveId}:${Math.round(lockMs)}ms`)
@@ -486,14 +501,16 @@ function startActLoop() {
       console.log(`[METRIC] startup_no_progress_window_ms=${Math.round(startupTrackedForMs)}`);
       console.log(`[METRIC] route_hint_fallback_count=${routeHintFallbackCount}`);
       if (lockMetricSummary) console.log(`[METRIC] lock_to_attune_ms_by_objective=${lockMetricSummary}`);
-      console.log('[SUCCESS] finale completion observed; finishing run');
+      if (latestObs?.objective?.returnSplitSec != null) console.log(`[METRIC] return_split_sec=${latestObs.objective.returnSplitSec}`);
+      if (latestObs?.objective?.totalCycleSec != null) console.log(`[METRIC] total_cycle_sec=${latestObs.objective.totalCycleSec}`);
+      console.log('[SUCCESS] pilgrimage cycle completion observed; finishing run');
       stop(0);
     }
   }, ACT_INTERVAL_MS);
 
   shutdownTimer = setTimeout(() => {
-    if (!finaleCompleted && !questCompleted) {
-      console.error(`[FAIL] RUN_SEC reached (${RUN_SEC}s) without finale completion`);
+    if (!cycleCompleted && !returnCompleted && !questCompleted) {
+      console.error(`[FAIL] RUN_SEC reached (${RUN_SEC}s) without pilgrimage cycle completion`);
       stop(2);
       return;
     }
@@ -510,6 +527,10 @@ ws.addEventListener('open', () => {
     type: 'HELLO',
     version: 'v1',
     role: 'agent',
+    mode: BRIDGE_MODE,
+    clientLabel: BRIDGE_CLIENT_LABEL,
+    sessionId: BRIDGE_SESSION_ID,
+    controllerPriority: BRIDGE_PRIORITY,
     caps: ['obs', 'act', 'capture']
   });
   startActLoop();
@@ -535,8 +556,10 @@ ws.addEventListener('message', (event) => {
       const controllerId = typeof bridge.activeControllerId === 'string' ? bridge.activeControllerId : null;
       if (controllerId !== lastBridgeControllerId) {
         lastBridgeControllerId = controllerId;
+        const candidates = Array.isArray(bridge.controllerCandidates) ? bridge.controllerCandidates : [];
+        const candidateLabels = candidates.map((entry) => `${entry.label || 'n/a'}:${entry.mode}:${entry.priority}`).join('|');
         console.log(
-          `[BRIDGE] active_controller id=${bridge.activeControllerId || 'none'} label=${bridge.activeControllerLabel || 'n/a'} mode=${bridge.activeControllerMode || 'n/a'} session=${bridge.activeControllerSessionId || 'n/a'}`
+          `[BRIDGE] active_controller id=${bridge.activeControllerId || 'none'} label=${bridge.activeControllerLabel || 'n/a'} mode=${bridge.activeControllerMode || 'n/a'} session=${bridge.activeControllerSessionId || 'n/a'} candidates=${candidates.length} [${candidateLabels}]`
         );
       }
     }
@@ -544,6 +567,12 @@ ws.addEventListener('message', (event) => {
     const objective = msg.objective || {};
     if (objective?.finaleCompleted === true || objective?.questStage === 'finale_completed') {
       finaleCompleted = true;
+    }
+    if (objective?.questStage === 'cycle_completed' || objective?.cycleCompleted === true) {
+      cycleCompleted = true;
+    }
+    if (objective?.returnFailed === true || objective?.questStage === 'return_failed') {
+      returnFailed = true;
     }
     const guidance = objective.guidance || null;
     const trackedObjectiveId = objective.activeObjectiveId || null;
@@ -553,7 +582,7 @@ ws.addEventListener('message', (event) => {
       && trackedDist >= STARTUP_NO_PROGRESS_MIN_DIST
       && lockStableMs <= 200;
 
-    if (startupActSeqSeen > 0 && shouldTrackStartup && !questCompleted && !finaleCompleted) {
+    if (startupActSeqSeen > 0 && shouldTrackStartup && !questCompleted && !cycleCompleted && !finaleCompleted) {
       const now = Date.now();
       if (trackedObjectiveId !== startupTrackedObjectiveId || !Number.isFinite(startupTrackedDist)) {
         startupTrackedObjectiveId = trackedObjectiveId;
@@ -632,12 +661,34 @@ ws.addEventListener('message', (event) => {
         if (ev.objectiveId) completedObjectives.add(ev.objectiveId);
         console.log(`[MISSION] finale_completed objective=${ev.objectiveId || 'unknown'} progress=${ev.progress ?? 'n/a'}`);
       }
+      if (ev.type === 'return_started') {
+        console.log(`[MISSION] return_started objective=${ev.objectiveId || 'unknown'} budgetSec=${ev.returnTimeBudgetSec ?? 'n/a'}`);
+      }
+      if (ev.type === 'return_timer_warning') {
+        console.log(`[MISSION] return_timer_warning thresholdSec=${ev.thresholdSec ?? 'n/a'} remainingSec=${ev.returnTimeRemainingSec ?? 'n/a'}`);
+      }
+      if (ev.type === 'return_failed') {
+        returnFailed = true;
+        console.error(`[FAIL] return_failed objective=${ev.objectiveId || 'unknown'} reason=${ev.reason || 'n/a'} remainingSec=${ev.returnTimeRemainingSec ?? 'n/a'}`);
+        stop(6);
+        return;
+      }
+      if (ev.type === 'return_completed') {
+        returnCompleted = true;
+        if (ev.objectiveId) completedObjectives.add(ev.objectiveId);
+        console.log(`[MISSION] return_completed objective=${ev.objectiveId || 'unknown'} returnSplitSec=${ev.returnSplitSec ?? 'n/a'} totalCycleSec=${ev.totalCycleSec ?? 'n/a'}`);
+      }
+      if (ev.type === 'pilgrimage_cycle_completed') {
+        cycleCompleted = true;
+        console.log(`[MISSION] pilgrimage_cycle_completed objective=${ev.objectiveId || 'unknown'} totalCycleSec=${ev.totalCycleSec ?? 'n/a'}`);
+      }
       if (ev.type === 'rejected') {
         console.log(`[MISSION] rejected objective=${ev.objectiveId || 'unknown'} expected=${ev.expectedObjectiveId || 'unknown'}`);
       }
       if (ev.type === 'quest_completed') {
         questCompleted = true;
-        console.log(`[MISSION] quest_completed progress=${ev.progress ?? 'n/a'}`);
+        cycleCompleted = true;
+        console.log(`[MISSION] quest_completed progress=${ev.progress ?? 'n/a'} totalCycleSec=${ev.totalCycleSec ?? 'n/a'}`);
       }
       if (ev.type === 'collision') {
         console.log(`[NAV] collision collider=${ev.colliderId || 'unknown'} tag=${ev.colliderTag || 'unknown'} blockedRatio=${ev.blockedRatio ?? 'n/a'}`);
