@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-27T00:14:03Z",
+  "updatedAt": "2026-02-27T00:19:07Z",
   "tasks": [
     {
       "taskId": "task-2026-02-26T21-38-34-744Z-1",
@@ -60,12 +60,12 @@
       "taskId": "task-2026-02-26T23-44-19-565Z-1",
       "cycleId": "2026-02-26T23-44-19-565Z",
       "title": "Pilgrimage pacing and waypoint guidance pass (faster objective handoffs + clearer route readability)",
-      "status": "implemented",
+      "status": "tested",
       "createdAt": "2026-02-26T23:44:19.565Z",
       "deadlineAt": "2026-02-27T14:44:19.565Z",
-      "owner": "executor",
-      "notes": "Lock-to-attune pacing rework shipped: attune window tuning + interaction cooldown guard fix eliminated premature interact spam; seeded 404/505/606 and screenshot validation all pass with lockToAttuneMs <= 2500 and startup_no_progress_window_ms=0.",
-      "updatedAt": "2026-02-27T00:14:03Z"
+      "owner": "playtester",
+      "notes": "Playtest pass: handoff screenshot run (seed 404) reached finale_completed/quest_completed with lockToAttuneMs beacon_1=495, beacon_2=586, beacon_3=498, sanctum_core=479 (all <=2500) and startup_no_progress_window_ms=0; supplemental 45s baseline smoke confirmed stable roam/target ACT loop.",
+      "updatedAt": "2026-02-27T00:19:07Z"
     }
   ]
 }

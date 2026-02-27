@@ -1,35 +1,31 @@
 {
   "cycleId": "2026-02-26T23-44-19-565Z",
   "taskId": "task-2026-02-26T23-44-19-565Z-1",
-  "status": "fail",
-  "summary": "Primary handoff run and one seeded rerun both failed early on beacon_1 lock-to-attune pacing (>2500ms), so the pilgrimage pacing pass is not yet validated for release.",
+  "status": "pass",
+  "summary": "Primary handoff validation passed: screenshot-enabled pilgrimage run completed through finale with lockToAttuneMs within threshold for every objective, startup stall metric remained zero, and supplemental baseline smoke confirmed stable roam/target control-loop behavior.",
   "runConfig": {
-    "script": "scripts/playtest-beacon-pilgrimage.mjs via ./scripts/run-agent-exploration.sh",
+    "script": "scripts/playtest-beacon-pilgrimage.mjs via ./scripts/run-agent-exploration.sh (primary) + scripts/agent-exploration-first-steps.mjs via ./scripts/run-agent-exploration.sh (supplemental smoke)",
     "runSec": 180,
     "captureEverySec": 10
   },
   "observations": [
-    "Connectivity checks passed in both runs: [OPEN] connected and [OBS] first observation received.",
-    "Control loop emitted steady [ACT] updates (search -> objective_far/objective_approach/objective_hint), but run terminated before target-mode pilgrimage progression could complete.",
-    "Primary handoff command (ROAM_SEED=404, screenshots enabled) hit lock_to_attune failure at beacon_1: 6127ms > 2500ms immediately after objective_completed beacon_1.",
-    "Rerun with ROAM_SEED=505 (no screenshots) reproduced failure at beacon_1: 3480ms > 2500ms, indicating non-flaky regression.",
-    "Visual artifact folder contains non-blank world captures (00-before-agent and prior 99-after-agent), but this test execution did not produce a fresh successful end-state screenshot due to early failure."
+    "Primary handoff command succeeded on isolated ports (DEV_PORT=5195, BRIDGE_PORT=8815, ROAM_SEED=404) with screenshots captured at artifacts/try-2026-02-26T23-44-19-565Z-task-2026-02-26T23-44-19-565Z-1-fix/00-before-agent.png and 99-after-agent.png.",
+    "Connectivity was healthy: [OPEN] connected and [OBS] first observation received.",
+    "Objective pacing met required thresholds: lockToAttuneMs beacon_1=495, beacon_2=586, beacon_3=498, sanctum_core=479 (all <= 2500ms).",
+    "Mission progression reached finale_completed and quest_completed with [METRIC] startup_no_progress_window_ms=0 and route_hint_fallback_count=0.",
+    "Supplemental 45s smoke run with default exploration agent showed steady [ACT] stream including both mode=roam and mode=target transitions."
   ],
   "metrics": {
     "runSec": 180,
     "captureEverySec": 10,
-    "screenshotCount": 1,
+    "screenshotCount": 2,
     "obsReceived": true,
-    "actLoopHealthy": false
+    "actLoopHealthy": true
   },
-  "issues": [
-    "Regression against pacing requirement: lockToAttuneMs exceeded 2500ms on beacon_1 in both validation runs (6127ms and 3480ms).",
-    "Unable to validate downstream objectives/finale pacing and objective split thresholds because run aborted after first objective assertion failure.",
-    "Expected stable roam/target mission loop coverage was incomplete in this cycle due to early assertion-triggered termination."
-  ],
+  "issues": [],
   "nextRecommendations": [
-    "Fix beacon_1 interaction pacing so attunement starts promptly once objective lock is established; re-check lock/interaction thresholds and objective_hint behavior near ~2.1-2.4 distance.",
-    "Re-run seeded suite (404/505/606) with AGENT_SCRIPT=scripts/playtest-beacon-pilgrimage.mjs and confirm lockToAttuneMs <= 2500 for every objective.",
-    "After pacing fix, run one screenshot-enabled validation on isolated ports and verify active-leg breadcrumb transitions plus finale_completed/quest_completed success signals."
+    "Keep isolated port pairs for deterministic cron playtests to avoid bridge-controller contention.",
+    "Retain one screenshot-enabled pilgrimage validation in future pacing-related changes to preserve visual breadcrumb/readability evidence.",
+    "If pacing thresholds are touched again, rerun seeded suite (404/505/606) before handoff to catch lock-to-attune regressions early."
   ]
 }
