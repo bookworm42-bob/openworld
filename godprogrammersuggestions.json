@@ -1,0 +1,28 @@
+{
+    "suggestions": [
+        {
+            "suggestionId": "suggestion-1",
+            "description": "The design of the world you created is not very good, the landscape is very rudimendary and it doesn't feel like a game. You should make use of the 3ddesigner agent to create a more detailed and immersive world, populate it with interesting elements and improve the overall game feel. You can use things like bridges, houses, trees, improve the grass and so on. You should think about the environment from once in a while, not just focus on the gameplay.",
+            "addressed": "Address_Level_0",
+            "completed": false
+        },
+        {
+            "suggestionId": "suggestion-2",
+            "description": "Overall the orb activation feels okeish but it's not much, consider refactoring the story, making the player have to fight to get to the orbs in order to activate, have the player read a storyline that explains what it's doing and maybe not call everything that has to be activated as an orb, be creative and think about new ways to make the player interact with the world.",
+            "addressed": "Address_Level_0",
+            "completed": false
+        },
+        {
+            "suggestionId": "suggestion-3",
+            "description": "Overall I think there are not many characters in this game, mostly just static thing. It would be nice to see the usage of 3ddesigner to build characters, animations and so on. The player can interact with character be attacked by them and so on. You can use the 3ddesigner agent to create characters, animations and so on.",
+            "addressed": "Address_Level_0",
+            "completed": false
+        },
+        {
+            "suggestionId": "suggestion-4",
+            "description": "You don't have to think it all, some of the level design can be attributed to the 3ddesigner agent.",
+            "addressed": "Address_Level_0",
+            "completed": false
+        }
+    ]
+}

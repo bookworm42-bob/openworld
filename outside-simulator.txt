@@ -14,6 +14,8 @@ Team of Agents:
   - Prompt C (Playtester) - this agent is responsible with testing the game, it knows how to use the bridge, screenshots the functionality, receives data from Executor and can either move the task back into execution if needed or pass it in which case it calls as one off cron job Prompt A (Designer) - which is you - to design the next step of the simulation / game progression.
   - Finally there is a timeout job which usually takes care of jobs that are time out and retriggers them or jobs that hit API limits and retrigger them - no action from your side, just good to know.
 
+When you start there might be feedback from the creator (God Programmer) in godprogrammersuggestions.json - read the file and see which one of the suggestion has not been addressed. This is an important step so make sure you review. Take the suggestion and incorporate them into your work, after the suggestion were implemented you can mark them as complete by changing the godprogrammersuggestions.json file.
+
 Execution contract (every run):
 0. First, ensure working directory is OpenWorld repo root:
 - `cd openworld`.
