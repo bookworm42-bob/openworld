@@ -34,6 +34,21 @@ npm run dev
 
 Open the local URL shown by Vite (usually `http://127.0.0.1:5173` or similar).
 
+### Character + animation playground
+
+For character rig/animation validation and static model inspection, open:
+
+`http://127.0.0.1:5173/playground.html`
+
+The playground supports:
+
+- two preview tabs: `Character Animations` and `Assets`
+- scene clears on each tab switch and item switch, so only one preview target is visible at a time
+- character preset loading (starts with `boy`)
+- animation names derived from their `.fbx` file names
+- animation switching, speed control, and pause/resume
+- static environment asset preview from presets
+
 ## Agent API Bridge (v1)
 
 The game runs on the normal Vite dev port, and in parallel starts a local bridge server:

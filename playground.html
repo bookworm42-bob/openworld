@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenWorld Character + Animation Playground</title>
+  </head>
+  <body>
+    <div id="playground-root">
+      <aside id="panel">
+        <h1>Playground</h1>
+        <p class="sub">Character animation and environment asset preview.</p>
+
+        <div class="tabs" role="tablist" aria-label="Playground mode">
+          <button id="tab-characters" class="tab active" type="button" role="tab" aria-selected="true">Character Animations</button>
+          <button id="tab-assets" class="tab" type="button" role="tab" aria-selected="false">Assets</button>
+        </div>
+
+        <section id="characters-panel" class="block">
+          <h2>Character</h2>
+          <label>Character</label>
+          <select id="character-select"></select>
+
+          <h2>Animation</h2>
+          <label>Animation</label>
+          <select id="animation-select"></select>
+
+          <button id="pause-animation-btn" type="button">Pause / Resume</button>
+
+          <label>Speed</label>
+          <input id="speed-input" type="range" min="0.1" max="2.5" step="0.05" value="1" />
+          <div id="speed-value">1.00x</div>
+        </section>
+
+        <section id="assets-panel" class="block hidden">
+          <h2>Asset</h2>
+          <label>Environment model</label>
+          <select id="model-select"></select>
+        </section>
+
+        <section class="block">
+          <h2>Status</h2>
+          <pre id="status">Ready.</pre>
+        </section>
+      </aside>
+
+      <main id="viewport">
+        <div id="canvas-host"></div>
+        <div id="help">Left drag orbit · Right drag pan · Wheel zoom</div>
+      </main>
+    </div>
+
+    <script type="module" src="/src/playground.js"></script>
+  </body>
+</html>

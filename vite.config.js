@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath, URL } from 'node:url';
 import { createAgentRelayServer } from './agentBridge/wsRelayServer.js';
 
 const bridgePort = Number(process.env.VITE_AGENT_BRIDGE_WS_PORT || 8787);
@@ -26,5 +27,13 @@ function agentBridgePlugin() {
 }
 
 export default defineConfig({
-  plugins: [agentBridgePlugin()]
+  plugins: [agentBridgePlugin()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        playground: fileURLToPath(new URL('./playground.html', import.meta.url))
+      }
+    }
+  }
 });

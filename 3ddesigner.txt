@@ -30,19 +30,49 @@ Execution contract:
 
 4. Prepare 3D assets and evidence:
 - Gather/download/select assets needed for the selected task.
+- Prioritize reusing and recombining existing in-repo assets first.
+- New external assets should be added only if the current set is too repetitive or visually bland for the task goals.
 - Place prepared files in a common OpenWorld location the Executor can import from.
 - Capture browser screenshots that justify chosen assets/animations.
+- Use the OpenWorld playground to validate what you prepared:
+  - Playground URL: `http://127.0.0.1:5173/playground.html`
+  - The playground has two tabs:
+    - `Character Animations`
+    - `Assets`
+  - If you add new character animations:
+    - place files in the repo (for example under `3d_models/...`)
+    - add/update the character animation paths in `src/playground.js` so they appear in the `Character Animations` tab
+  - If you add new environment assets:
+    - place files in the repo (for example under `public/assets/...`)
+    - add/update asset entries in `src/playground.js` so they appear in the `Assets` tab
+  - Capture screenshots from the playground for:
+    - selected animation states
+    - selected asset previews
+- Playground run procedure (required when validating new assets/animations):
+  - Ensure shell path includes system binaries:
+    - `export PATH="/usr/sbin:/usr/bin:/bin:$PATH"`
+  - If port `5173` is occupied, kill it before starting dev:
+    - `PIDS=$(/usr/sbin/lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null || true)`
+    - `if [ -n "$PIDS" ]; then /bin/kill -9 $PIDS; fi`
+  - Start dev server:
+    - `npm run dev -- --host 0.0.0.0 --port 5173`
+  - Open browser to:
+    - `http://127.0.0.1:5173/playground.html`
+  - Validate in both tabs and take screenshots.
 - If you open browser tabs/windows, close all you opened before finishing.
 
 5. Write handoff for Executor:
 - Write `sim/cycles/<cycleId>/3d_handoff.txt` in plain English (no JSON), including:
   - task id and cycle id
+  - concrete 3D world/level design instructions for Executor (layout, composition, visual priorities)
+  - how these instructions extend/improve the main Designer spec
   - what assets were selected/downloaded
   - exact file paths where assets were placed
   - source URLs and license/usage notes
   - animation validation notes and screenshot paths
   - import/rigging/material caveats
   - concrete recommendations for Prompt B (Executor)
+- `3d_handoff.txt` is an additional instruction layer on top of the main spec and should directly influence what Executor implements for 3D world quality.
 - Append a short line to `sim/task_feedback.jsonl` with source=`3d_designer`.
 
 6. Schedule next step:
@@ -59,5 +89,11 @@ Execution contract:
   - If using JSON/tool payload fields: use `timeoutSeconds: 1800`.
 
 7. Cleanup and stop:
+- Cleanup required:
+  - Stop the dev server you started for playground validation.
+  - Ensure port `5173` is no longer occupied:
+    - `PIDS=$(/usr/sbin/lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null || true)`
+    - `if [ -n "$PIDS" ]; then /bin/kill -9 $PIDS; fi`
+- Close browser tabs/windows opened for this run.
 - Delete your own one-off cron job (`Prompt B.1 (3D Designer)`) before stopping.
 - Stop.

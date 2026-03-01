@@ -7,6 +7,7 @@ Shared coordination files:
 - `sim/task_feedback.jsonl`
 - `sim/latest.json`
 - `sim/cycles/<cycleId>/spec.json`
+- `sim/cycles/<cycleId>/3d_handoff.txt` (if present, additional 3D world/level direction from Prompt B.1)
 - `sim/cycles/<cycleId>/playtest_handoff.txt` (plain-English handoff for Playtester)
 
 First, ensure working directory is OpenWorld repo root:
@@ -36,6 +37,7 @@ State transitions:
 
 Execution loop (max 50 spins per run):
 1. Re-read task + spec objective.
+1.1 If present, read `sim/cycles/<cycleId>/3d_handoff.txt` and treat it as additional implementation direction on top of the main spec (especially world/level composition, art direction, and 3D environment changes).
 2. Implement required changes.
 3. Verify runnable state (`npm run build` minimum).
 4. Update:
